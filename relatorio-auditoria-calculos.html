@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><title>Auditoria de Cálculos da Carteira</title>
+<style>
+@page{size:A4;margin:16mm 15mm}*{box-sizing:border-box}body{font-family:Segoe UI,Arial,sans-serif;color:#17212b;font-size:10.5pt;line-height:1.45;margin:0}h1{font-size:25pt;line-height:1.1;color:#12372d;margin:0 0 10px}h2{font-size:16pt;color:#145c47;border-bottom:2px solid #087f5b;padding-bottom:4px;margin:22px 0 8px;page-break-after:avoid}h3{font-size:12pt;color:#145c47;margin:15px 0 5px;page-break-after:avoid}p{margin:6px 0 9px}ul{padding-left:20px}li{margin:3px 0}code{font-family:Consolas,monospace;background:#eef2f4;padding:1px 3px;border-radius:3px}pre{white-space:pre-wrap;background:#18232b;color:#edf5f2;padding:10px 12px;border-radius:5px;font:8.5pt/1.4 Consolas,monospace;page-break-inside:avoid}.cover{min-height:245mm;display:flex;flex-direction:column;justify-content:center;border-left:7px solid #087f5b;padding-left:23px}.eyebrow{color:#087f5b;text-transform:uppercase;letter-spacing:2px;font-weight:700;font-size:9pt}.subtitle{color:#5d6b78;font-size:13pt}.meta{margin-top:26px;border-top:1px solid #d9e0e6;padding-top:11px;color:#5d6b78}.box{background:#f3f7f5;border:1px solid #cfe3da;border-left:4px solid #087f5b;padding:10px 13px;margin:10px 0 14px;page-break-inside:avoid}.warning{background:#fff6df;border-color:#edd28b;border-left-color:#c28a00}table{width:100%;border-collapse:collapse;margin:9px 0 14px;font-size:9.5pt;page-break-inside:avoid}th,td{border:1px solid #d9e0e6;padding:7px 8px;text-align:left;vertical-align:top}th{background:#e7f1ec;color:#164c3d}.small{color:#5d6b78;font-size:9pt}.footer{border-top:1px solid #d9e0e6;padding-top:7px;color:#5d6b78;font-size:8.5pt;margin-top:22px}
+</style></head><body>
+<section class="cover"><div class="eyebrow">Auditoria técnica do código</div><h1>Cálculo de Custo, Valor Total e Lucro</h1><p class="subtitle">Análise do tratamento de preço médio, quantidades fracionadas e rentabilidade da carteira.</p><div class="meta"><strong>Projeto:</strong> CompraCerta<br><strong>Data:</strong> 16 de setembro de 2026<br><strong>Escopo:</strong> cálculo de ativos, formulário, cripto fracionada e componentes de exibição</div></section>
+<h2>1. Resumo executivo</h2><div class="box"><strong>Conclusão:</strong> o sistema trata <code>pm</code> como preço médio unitário. O custo total é calculado como <code>quantidade × preço médio</code>; o valor atual como <code>quantidade × preço atual</code>.</div>
+<pre>valorTotal = qty * price
+valorInvestido = qty * pm
+lucro = valorTotal - valorInvestido
+rentabilidade = (lucro / valorInvestido) * 100</pre>
+<p>Para cripto fracionada, a fórmula matemática está correta. O principal ponto de atenção está no formulário, que usa <code>step="0.01"</code> para campos numéricos e pode dificultar quantidades como <code>0.005</code>.</p>
+<h2>2. Custo total</h2><p>O cálculo está em <code>src/services/calculationService.js</code>, na função <code>calculatePortfolioTotals</code>:</p><pre>const valorInvestido = Number(item.qty) * Number(item.pm);</pre><p>Isso confirma que o sistema multiplica:</p><pre>Custo Total = Quantidade × Preço Médio Unitário</pre><p>O usuário deve informar o preço de uma unidade inteira do ativo, mesmo quando compra uma fração.</p>
+<h3>Exemplo: 0.005 BTC</h3><pre>Quantidade: 0.005 BTC
+Preço médio unitário: R$ 300.000,00
+
+Custo total = 0.005 × 300.000
+Custo total = R$ 1.500,00</pre><div class="box warning"><strong>Preenchimento incorreto:</strong> informar R$ 1.500,00 como preço médio faria o sistema calcular <code>0.005 × 1.500 = R$ 7,50</code>.</div>
+<h2>3. Valor total atual</h2><p>O valor de mercado é calculado em <code>calculationService.js</code>:</p><pre>const valorTotal = Number(item.qty) * Number(item.price);</pre><p>Com 0.005 BTC e preço atual de R$ 320.000,00:</p><pre>Valor atual = 0.005 × 320.000
+Valor atual = R$ 1.600,00</pre><p>A tabela exibe <code>item.valorTotal</code> em <code>src/components/Portfolio/AssetsTable.jsx</code>.</p>
+<h2>4. Lucro e prejuízo</h2><p>O lucro individual é calculado por:</p><pre>const lucro = valorTotal - valorInvestido;</pre><p>No exemplo:</p><pre>Lucro = R$ 1.600,00 - R$ 1.500,00
+Lucro = R$ 100,00</pre><p>O valor e a cor do lucro são exibidos em <code>src/components/Portfolio/AssetsTable.jsx</code>.</p>
+<h2>5. Rentabilidade percentual</h2><p>A rentabilidade individual é calculada por:</p><pre>const rentabilidade = valorInvestido > 0
+  ? (lucro / valorInvestido) * 100
+  : 0;</pre><p>Exemplo:</p><pre>Rentabilidade = (100 / 1.500) × 100
+Rentabilidade = 6,67%</pre><p>Para quantidade fracionada, a quantidade aparece no numerador e no denominador e se cancela matematicamente:</p><pre>(qty × preçoAtual - qty × preçoMédio) / (qty × preçoMédio)</pre><p>Portanto, a rentabilidade percentual depende da variação entre o preço unitário atual e o preço unitário médio, não do tamanho da posição.</p>
+<h2>6. Tratamento no formulário</h2><p>Os campos comuns estão definidos em <code>src/components/Forms/AssetForm.jsx</code>:</p><pre>['qty', 'qtd', ''], ['pm', 'pm', ''], ['price', 'cotacao', '']</pre><p>Os campos numéricos recebem:</p><pre>type="number"
+step="0.01"</pre><div class="box warning"><strong>Atenção para cripto:</strong> embora o cálculo aceite <code>0.005</code>, <code>step="0.01"</code> pode fazer o navegador considerar o valor inválido. Para cripto, recomenda-se <code>step="any"</code> ou um passo menor, como <code>0.00000001</code>.</div>
+<h2>7. Conversão e persistência do ativo</h2><p>Ao salvar, <code>src/pages/PortfolioPage.jsx</code> converte os campos:</p><pre>qty: Number(formData.qty) || 1,
+pm: parseOptionalNumber(formData.pm),
+price: Number(formData.price)</pre><p>Quantidade válida como <code>0.005</code> é preservada. Quantidade vazia ou zero cai no padrão <code>1</code>.</p><p>O preço médio utiliza <code>parseNumericInput</code>, que aceita formatos brasileiros como <code>300.000,50</code>. Já o preço atual usa <code>Number()</code> diretamente, podendo falhar com vírgula decimal em determinados formatos.</p>
+<h2>8. Totais gerais da carteira</h2><p>Em <code>calculationService.js</code>, os valores são acumulados:</p><pre>patrimonio += valorTotal;
+investido += valorInvestido;</pre><p>Depois:</p><pre>const lucroTotal = patrimonio - investido;
+const rentabilidadeTotal = investido > 0
+  ? (lucroTotal / investido) * 100
+  : 0;</pre><p>A função é executada via <code>useMemo</code> em <code>src/App.jsx</code> e os indicadores são exibidos em <code>src/components/Common/KPICards.jsx</code>.</p>
+<h2>9. Referências e regra de preenchimento</h2><table><tr><th>Informação</th><th>Arquivo</th><th>Regra</th></tr><tr><td>Custo total</td><td><code>src/services/calculationService.js</code></td><td><code>qty × pm</code></td></tr><tr><td>Valor atual</td><td><code>src/services/calculationService.js</code></td><td><code>qty × price</code></td></tr><tr><td>Lucro</td><td><code>src/services/calculationService.js</code></td><td><code>valorTotal - valorInvestido</code></td></tr><tr><td>Rentabilidade</td><td><code>src/services/calculationService.js</code></td><td><code>lucro / valorInvestido × 100</code></td></tr><tr><td>Entrada</td><td><code>src/components/Forms/AssetForm.jsx</code></td><td>Quantidade decimal limitada por <code>step=0.01</code></td></tr><tr><td>Persistência</td><td><code>src/pages/PortfolioPage.jsx</code></td><td><code>pm</code> e <code>price</code> são valores unitários</td></tr></table>
+<div class="box"><strong>Regra para o usuário:</strong><br>Quantidade = quantidade real adquirida.<br>Preço Médio = preço unitário de uma unidade inteira.<br>Preço Atual = preço unitário atual de uma unidade inteira.</div><p class="footer">Relatório gerado a partir do estado atual do código-fonte do projeto CompraCerta.</p>
+</body></html>

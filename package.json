@@ -1,0 +1,31 @@
+{
+  "name": "goescompracerta",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "set NODE_ENV=development&& set API_PORT=3001&& node server.mjs",
+    "start": "NODE_ENV=production node server.mjs",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.483.0",
+    "mysql2": "^3.24.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.8.0",
+    "xlsx": "^0.18.5",
+    "yahoo-finance2": "^4.0.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.22",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "vite": "^5.4.1"
+  }
+}

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Auditoria Explicativa do Benchmark</title>
+<style>
+@page{size:A4;margin:18mm 17mm}body{font-family:Georgia,'Times New Roman',serif;color:#17202a;font-size:10.5pt;line-height:1.43;margin:0}h1{text-align:center;font-size:20pt;margin:48mm 0 8pt}h2{font-size:14pt;border-bottom:1px solid #9aa4ad;padding-bottom:3pt;margin:18pt 0 7pt;page-break-after:avoid}h3{font-size:11.5pt;margin:12pt 0 4pt;page-break-after:avoid}p{margin:0 0 7pt;text-align:justify}pre{font:8.5pt 'Courier New',monospace;background:#f1f3f5;border:1px solid #d4d9de;padding:7pt;white-space:pre-wrap;page-break-inside:avoid}.cover{text-align:center;page-break-after:always}.meta{text-align:center;color:#4b5563;margin-top:16pt}.box{padding:8pt 10pt;border-left:4px solid #0f766e;background:#effcf8;margin:8pt 0}.warn{padding:8pt 10pt;border-left:4px solid #b91c1c;background:#fff5f5;margin:8pt 0}li{margin-bottom:3pt}.small{font-size:9pt;color:#4b5563}.table{border-collapse:collapse;width:100%;font-size:9pt;margin:7pt 0}.table th,.table td{border:1px solid #aeb7c0;padding:5pt;text-align:left;vertical-align:top}.table th{background:#e9eef2}
+</style>
+</head>
+<body>
+<section class="cover"><h1>LAUDO DE AUDITORIA TÉCNICA E MATEMÁTICA DO BENCHMARK</h1><p><strong>Diagnóstico explicativo do módulo de comparação financeira</strong></p><p class="meta">Componentes auditados: BenchmarkChart.jsx, server.mjs e integração Vite/BCB</p><p class="meta">Séries: CDI 4392 e Poupança 196</p><p class="meta">Documento consolidado para impressão e exportação em PDF</p></section>
+<h2>1. Sumário Executivo</h2><p>O módulo de Benchmark consulta as séries 4392 e 196 do Banco Central por meio do endpoint local <em>/api/bcb</em>. O backend valida as séries, encaminha a consulta ao SGS/BCB, remove duplicidades e devolve os dados ao frontend.</p><p>O diagnóstico identificou três causas distintas para o comportamento visual observado:</p><ol><li>A Poupança é acumulada corretamente como fator, mas é exibida como <em>fator * 100</em>, fazendo o primeiro ponto aparecer próximo de 100% em vez de aproximadamente 0,67%.</li><li>O eixo Y é dimensionado pela Poupança artificialmente elevada, comprimindo as variações do CDI e fazendo as linhas parecerem retas.</li><li>A data atual é adicionada mesmo sem observação do BCB, criando um ponto em que CDI e Poupança ficam nulos e somente a carteira possui valor.</li></ol><div class="box"><strong>Conclusão executiva:</strong> o backend está entregando dados mensais válidos e ordenados. A falha principal está na conversão do acumulado da Poupança para percentual, seguida pelo desalinhamento visual provocado pela injeção da data atual.</div>
+<h2>2. Arquitetura e Fluxo de Dados</h2><pre>DashboardPage.jsx
+  -> BenchmarkChart.jsx
+  -> /api/bcb via proxy Vite
+  -> server.mjs
+  -> API SGS/BCB
+  -> parse das séries
+  -> montagem de chartData
+  -> Recharts</pre><p>O Dashboard envia ao componente os totais atuais da carteira, especialmente <em>totals.patrimonio</em> e <em>totals.investido</em>. O componente solicita uma janela aproximada de 12 meses, começando no primeiro dia do mês de referência e terminando na data atual.</p><p>O Vite encaminha <em>/api</em> para <em>http://127.0.0.1:3001</em>. O backend usa a URL-base:</p><pre>https://api.bcb.gov.br/dados/serie/bcdata.sgs.{serie}/dados</pre><p>As séries permitidas no backend são:</p><pre>12, 4390, 4392, 196</pre><p>Para o benchmark atual são consultadas:</p><table class="table"><tr><th>Série</th><th>Uso</th><th>Periodicidade observada</th></tr><tr><td>4392</td><td>CDI exibido diretamente</td><td>Mensal, registros no dia 01</td></tr><tr><td>196</td><td>Poupança acumulada</td><td>Mensal, registros no dia 01</td></tr></table>
+<h2>3. Evidência dos Dados Retornados</h2><p>Uma consulta real ao endpoint retornou 13 registros para cada série no intervalo analisado.</p><p>Exemplos da série 4392:</p><pre>01/09/2025 -> 14,90
+01/10/2025 -> 14,90
+01/11/2025 -> 14,90
+01/07/2026 -> 14,15
+01/08/2026 -> 13,94
+01/09/2026 -> 13,90</pre><p>Exemplos da série 196:</p><pre>01/09/2025 -> 0,6751
+01/10/2025 -> 0,6767
+01/11/2025 -> 0,6642
+01/07/2026 -> 0,6738
+01/08/2026 -> 0,6701
+01/09/2026 -> 0,6698</pre><p>Os dados possuem variação mensal. Não foi identificado no backend repetição indevida, inversão cronológica ou duplicação relevante após a deduplicação por data.</p>
+<h2>4. Diagnóstico da Poupança no Topo do Gráfico</h2><p>O componente inicia o fator acumulado em:</p><pre>let savingsAccumulated = 1;</pre><p>A capitalização mensal é:</p><pre>savingsAccumulated *= 1 + (savingsRate / 100);</pre><p>Essa operação está correta para formar o fator acumulado. O erro está na saída:</p><pre>point.poupanca = Number((savingsAccumulated * 100).toFixed(4));</pre><p>O número 1 representa 100% do capital original. Ele não representa 100% de rentabilidade. Com uma taxa de 0,6751%:</p><pre>fator acumulado = 1,006751
+saída atual = 1,006751 * 100 = 100,6751%
+retorno correto = (1,006751 - 1) * 100 = 0,6751%</pre><p>Assim, a série começa artificialmente na faixa de 100%. Depois de vários meses, continua na faixa de 100% a 110%, embora o retorno real acumulado esteja na faixa aproximada de 0% a 10%.</p>
+<h2>5. Diagnóstico das Linhas Retas ou Chapadas</h2><p>O eixo Y é calculado com o maior valor de todas as séries:</p><pre>const yMax = Math.max(
+  1,
+  Math.ceil(Math.max(...yValues, 0) * 1.1 / 5) * 5
+);</pre><p>Como a Poupança está em torno de 100%, o eixo pode chegar a aproximadamente 115%. Nesse intervalo:</p><ul><li>CDI entre aproximadamente 13,90% e 14,90% ocupa uma faixa pequena;</li><li>as alterações mensais do CDI ficam visualmente comprimidas;</li><li>a Poupança parece uma linha alta e pouco informativa;</li><li>a percepção é de linhas retas ou estáticas, apesar de existirem variações nos dados.</li></ul><p>A série CDI 4392 também possui valores iguais por alguns meses. Isso contribui para trechos horizontais, mas não há evidência de que o <em>cdiMap</em> esteja repetindo todos os valores artificialmente.</p>
+<h2>6. Diagnóstico do Mapeamento e das Datas</h2><p>O mapeamento do CDI é:</p><pre>const cdiByDate = new Map(cdi.map((item) => [item.date, item.rate]));</pre><p>O mapeamento da Poupança é:</p><pre>const savingsByDate = new Map(poupanca.map((item) => [item.date, item.rate]));</pre><p>Como as datas são convertidas para o formato ISO <em>yyyy-MM-dd</em>, a ordenação textual é cronologicamente válida.</p><p>A união é montada com:</p><pre>const dates = Array.from(new Set([
+  ...cdiByDate.keys(),
+  ...savingsByDate.keys(),
+  end
+])).filter((date) => date >= start && date <= end).sort();</pre><p>As séries BCB terminam no dia 01 do mês. O código adiciona ainda a data atual, por exemplo:</p><pre>01/09/2026 -> dados BCB disponíveis
+14/09/2026 -> apenas carteira, CDI null, Poupança null</pre><p>Com <em>connectNulls={false}</em>, CDI e Poupança terminam antes do ponto final da carteira. Isso cria uma quebra visual, mas não é a causa da Poupança subir para o topo.</p>
+<h2>7. CDI: Regra Atual e Limitação</h2><p>O CDI 4392 é colocado diretamente no ponto correspondente:</p><pre>cdi: cdiByDate.has(date)
+  ? Number(cdiByDate.get(date).toFixed(4))
+  : null</pre><p>Não há acumulação manual do CDI no frontend. Isso é coerente com a interpretação adotada de que a série já representa um valor anualizado. O código, entretanto, não implementa um calendário explícito de dias úteis, feriados, convenção de 252 dias ou reconstrução diária.</p><p>Portanto, o componente não calcula o CDI oficial diário do zero. Ele exibe diretamente o valor retornado pela série 4392 nas datas mensais disponíveis. A confiabilidade depende da semântica oficial dessa série e da unidade do valor recebido.</p>
+<h2>8. Carteira</h2><p>A carteira é calculada por:</p><pre>portfolioReturn = invested > 0
+  ? ((patrimony / invested) - 1) * 100
+  : 0;</pre><p>Ela só recebe valor na data final:</p><pre>carteira: date === end ? portfolioReturn : null</pre><p>Não existe histórico retroativo de patrimônio no componente. Não há interpolação linear, snapshots históricos, preços históricos, retorno ponderado no tempo, retorno ponderado por dinheiro ou recomposição histórica de dividendos.</p><div class="warn"><strong>Risco de interpretação:</strong> o eixo cobre 12 meses, mas a carteira possui apenas um ponto atual. O gráfico pode sugerir evolução histórica onde existe somente uma observação final.</div>
+<h2>9. Tratamento de Falhas</h2><p>As consultas são feitas com <em>Promise.allSettled</em>. Se uma série falha, ela vira um array vazio e a outra pode continuar sendo exibida.</p><p>O backend retorna:</p><ul><li>HTTP 400 para série não permitida ou datas inválidas;</li><li>HTTP 502 quando o BCB falha ou retorna vazio;</li><li>HTTP 200 com os dados válidos.</li></ul><p>O frontend exibe aviso quando CDI ou Poupança ficam indisponíveis. Não existe fallback numérico fictício de 0,85% ou 0,50% no código atual auditado.</p>
+<h2>10. Parecer de Integridade</h2><table class="table"><tr><th>Aspecto</th><th>Avaliação</th></tr><tr><td>Whitelist e proxy BCB</td><td>Funcionando; séries permitidas e datas validadas.</td></tr><tr><td>Ordenação e deduplicação</td><td>Adequadas; datas ISO e backend ordenado.</td></tr><tr><td>Variação real das séries</td><td>Confirmada; o BCB retorna valores mensais diferentes.</td></tr><tr><td>Acumulação matemática da Poupança</td><td>Fator composto correto, conversão para percentual incorreta.</td></tr><tr><td>CDI</td><td>Exibido diretamente; sem cálculo diário explícito.</td></tr><tr><td>Datas</td><td>Mensais corretas, mas com data atual adicional sem benchmark.</td></tr><tr><td>Carteira</td><td>Apenas ponto atual; sem histórico real.</td></tr></table>
+<h2>11. Conclusão</h2><p>O endpoint do backend não é a origem principal das anomalias. Ele fornece dados mensais válidos e ordenados para as séries 4392 e 196.</p><p>A causa principal da escala incorreta é a conversão da Poupança acumulada:</p><pre>errado:  savingsAccumulated * 100
+correto: (savingsAccumulated - 1) * 100</pre><p>A causa da aparência chapada é a combinação entre o erro de escala da Poupança e as pequenas variações do CDI em relação ao eixo inflado.</p><p>A causa do buraco no final é a inclusão da data atual sem observações BCB, somada a <em>connectNulls={false}</em>.</p><p class="box"><strong>Parecer final:</strong> o módulo é funcional como gráfico aproximado, mas apresenta um erro matemático objetivo na série da Poupança e uma limitação visual de alinhamento no ponto atual. A carteira não representa histórico de 12 meses; representa somente o retorno atual calculado a partir de patrimônio e total investido.</p><p class="small"><strong>Registro:</strong> este documento consolida a auditoria do estado observado. Nenhuma alteração de código foi aplicada para produzir este laudo.</p>
+</body></html>

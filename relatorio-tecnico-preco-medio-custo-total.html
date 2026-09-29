@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Relatório Técnico - Preço Médio e Custo Total</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    :root { color: #172033; background: #fff; font-family: "Segoe UI", Arial, sans-serif; }
+    body { margin: 0; font-size: 10.5pt; line-height: 1.48; }
+    h1 { color: #0f5132; font-size: 24pt; line-height: 1.15; margin: 0 0 6pt; }
+    h2 { color: #0f5132; font-size: 16pt; border-bottom: 1px solid #b8d8c5; padding-bottom: 4pt; margin: 20pt 0 8pt; break-after: avoid; }
+    h3 { color: #1f6b47; font-size: 12.5pt; margin: 14pt 0 5pt; break-after: avoid; }
+    h4 { font-size: 11pt; margin: 10pt 0 4pt; }
+    p { margin: 5pt 0 8pt; }
+    .cover { border-left: 7px solid #198754; padding: 18mm 12mm; margin-bottom: 18pt; }
+    .subtitle { color: #52606d; font-size: 12pt; }
+    .meta { color: #667085; margin-top: 18pt; }
+    .box { background: #f0f8f3; border: 1px solid #b8d8c5; border-radius: 5px; padding: 10pt 12pt; margin: 10pt 0; }
+    .warning { background: #fff8e6; border-color: #e8c66a; }
+    code { font-family: Consolas, monospace; font-size: 9pt; background: #f1f3f5; padding: 1px 3px; border-radius: 2px; }
+    pre { background: #f4f6f8; border: 1px solid #d8dee4; border-radius: 4px; padding: 8pt; white-space: pre-wrap; font: 8.5pt/1.4 Consolas, monospace; }
+    table { width: 100%; border-collapse: collapse; margin: 8pt 0 12pt; font-size: 9pt; break-inside: avoid; }
+    th { background: #e7f3eb; color: #173b27; text-align: left; }
+    th, td { border: 1px solid #cbd5d1; padding: 5pt 6pt; vertical-align: top; }
+    .small { font-size: 8.8pt; color: #52606d; }
+    .page-break { break-before: page; }
+    ul { margin-top: 4pt; }
+    li { margin: 3pt 0; }
+    .formula { text-align: center; font: 11pt Consolas, monospace; margin: 8pt 0; }
+    footer { color: #667085; font-size: 8pt; border-top: 1px solid #d8dee4; margin-top: 20pt; padding-top: 5pt; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <h1>Relatório Técnico Explicativo</h1>
+    <div class="subtitle">Preço Médio e Custo Total dos ativos Cripto e EUA/Globais</div>
+    <div class="meta">Projeto CompraCerta · Auditoria do comportamento atual · 16/09/2026</div>
+  </section>
+
+  <div class="box">
+    <strong>Resumo executivo.</strong> Para Cripto, o valor digitado no campo visual “Preço Médio” é tratado no submit como Total Investido e dividido pela quantidade antes de ser salvo como <code>pm</code>. Para EUA/Globais, o valor de <code>pm</code> é salvo sem conversão cambial. A cotação atual internacional pode ser convertida de USD para BRL na atualização automática, mas o preço médio não é convertido. Como a tabela formata tudo como BRL e calcula o custo como <code>qty × pm</code>, ativos internacionais podem misturar USD e BRL.
+  </div>
+
+  <h2>1. Fluxo de dados</h2>
+  <h3>1.1 Formulário</h3>
+  <p>O formulário real está em <code>src/components/Forms/AssetForm.jsx</code>. O caminho <code>src/components/Portfolio/AssetForm.jsx</code> não existe.</p>
+  <pre>const COMMON_FIELDS = [
+  ['ticker', 'ticker', '', 'text'],
+  ['qty', 'quantidade', '', 'number'],
+  ['pm', 'precoMedio', '', 'number'],
+  ['price', 'cotacao', '', 'number'],
+  ['meta', 'meta', '', 'number']
+];</pre>
+  <table>
+    <tr><th>Campo visual</th><th>Campo interno</th><th>Tipo</th></tr>
+    <tr><td>Ticker</td><td><code>ticker</code></td><td>text</td></tr>
+    <tr><td>Quantidade</td><td><code>qty</code></td><td>number</td></tr>
+    <tr><td>Preço Médio</td><td><code>pm</code></td><td>number</td></tr>
+    <tr><td>Cotação Atual</td><td><code>price</code></td><td>number</td></tr>
+  </table>
+  <p>O ticker é convertido para maiúsculas no <code>onChange</code>. Quantidade, preço médio e cotação permanecem como texto no estado do formulário até o submit.</p>
+
+  <h3>1.2 Submissão e persistência</h3>
+  <p>O fluxo é:</p>
+  <pre>AssetForm → handleSaveAsset → objeto updated → onAddAsset/onUpdateAsset
+→ useAssets → assetsStorage.set → localStorage</pre>
+  <p>O submit está em <code>src/pages/PortfolioPage.jsx</code>. O hook <code>useAssets</code> não transforma valores: apenas mantém o estado e grava o JSON no <code>localStorage</code>. O serviço <code>storageService.js</code> também não aplica câmbio ou fórmulas.</p>
+
+  <h3>1.3 Exibição</h3>
+  <p><code>calculatePortfolioTotals</code> produz a lista derivada. A tabela <code>AssetsTable.jsx</code> exibe <code>item.pm</code> e <code>item.price</code> diretamente. A função <code>formatMoney</code> formata qualquer número como BRL, sem conhecer a moeda original.</p>
+
+  <h2>2. Fórmulas atuais</h2>
+  <h3>2.1 Cripto</h3>
+  <p>A identificação usa o tipo ou uma lista de símbolos conhecidos. No submit:</p>
+  <pre>if (isCrypto(formData.type, formData.ticker)
+    && quantity &gt; 0
+    && enteredAveragePrice &gt; 0) {
+  return enteredAveragePrice / quantity;
+}</pre>
+  <div class="formula">pm salvo = Total Investido / Quantidade</div>
+  <p>Exemplo SOL: entrada <code>380</code>, quantidade <code>5</code>. O sistema salva <code>pm = 380 / 5 = 76</code>. Depois calcula <code>valorInvestido = 5 × 76 = 380</code>.</p>
+  <p>Exemplo BTC: entrada <code>1600</code>, quantidade <code>0,005</code>. O sistema salva <code>pm = 1600 / 0,005 = 320.000</code>. O custo calculado é <code>0,005 × 320.000 = 1.600</code>.</p>
+  <p>A CoinGecko é consultada com <code>vs_currencies=brl</code>; portanto, a cotação retornada para <code>price</code> já vem em BRL e não sofre nova conversão.</p>
+
+  <h3>2.2 EUA/Globais</h3>
+  <p>Para ações dos EUA, REITs e ETFs internacionais, a condição de Cripto é falsa. O valor digitado é salvo diretamente:</p>
+  <div class="formula">pm salvo = Preço Médio digitado</div>
+  <p>O custo é calculado em <code>src/services/calculationService.js</code>:</p>
+  <pre>const valorInvestido = Number(item.qty) * Number(item.pm);</pre>
+  <p>Exemplo AAPL: quantidade <code>10</code>, preço médio <code>1500 USD</code>. O sistema calcula <code>10 × 1500 = 15.000</code>, embora o esperado em BRL, com câmbio <code>5,15</code>, fosse:</p>
+  <div class="formula">1500 × 5,15 × 10 = R$ 77.250,00</div>
+  <p>A cotação atual, quando atualizada pela Alpha Vantage, pode ser convertida:</p>
+  <pre>priceBrl = originalPrice * rate;</pre>
+  <p>O <code>pm</code> não é convertido pelo serviço de cotações nem pelo hook <code>useUpdateQuotes</code>.</p>
+
+  <h2>3. Evidências e diagnóstico crítico</h2>
+  <table>
+    <tr><th>Verificação</th><th>Resultado atual</th></tr>
+    <tr><td>Divisão dupla em Cripto</td><td>Não há divisão dupla no cadastro. A edição reconstrói o total com <code>pm × qty</code> e o novo submit divide novamente; é uma conversão reversível, mas confusa.</td></tr>
+    <tr><td>Conversão de Cripto em todos os ativos</td><td>Não. Só ocorre quando <code>isCrypto(type, ticker)</code> é verdadeiro.</td></tr>
+    <tr><td>Câmbio aplicado ao <code>pm</code> internacional</td><td>Não. O câmbio é aplicado somente à cotação atual retornada pela Alpha Vantage.</td></tr>
+    <tr><td>Moedas misturadas</td><td>Sim. O <code>pm</code> pode permanecer em USD enquanto <code>price</code> passa a estar em BRL.</td></tr>
+  </table>
+  <div class="box warning"><strong>Observação sobre decimais:</strong> <code>pm</code> usa <code>parseNumericInput</code>, que aceita vírgula decimal. Já <code>qty</code> é convertido diretamente com <code>Number(formData.qty)</code>; portanto, <code>0.005</code> funciona, mas <code>5,5</code> pode resultar em <code>NaN</code> e cair no valor padrão <code>1</code>.</div>
+
+  <h2>4. Comparação: Cripto</h2>
+  <table>
+    <tr><th>Ativo</th><th>Qtd.</th><th>Entrada</th><th><code>pm</code> salvo</th><th>Tabela</th><th>Custo</th><th>Correto?</th></tr>
+    <tr><td>SOL</td><td>5</td><td>Total: 380</td><td>76</td><td>R$ 76,00</td><td>R$ 380,00</td><td>Sim, se 380 for total em BRL</td></tr>
+    <tr><td>BTC</td><td>0,005</td><td>Total: 1600</td><td>320.000</td><td>R$ 320.000,00</td><td>R$ 1.600,00</td><td>Sim, se 1600 for total em BRL</td></tr>
+  </table>
+  <p>O problema de Cripto é principalmente semântico: o campo é chamado “Preço Médio”, mas funciona como “Total Investido”.</p>
+
+  <h2>5. Comparação: EUA/Globais</h2>
+  <table>
+    <tr><th>Ativo</th><th>Qtd.</th><th>Entrada USD</th><th><code>pm</code> salvo</th><th>Custo atual</th><th>Custo esperado a 5,15</th><th>Correto?</th></tr>
+    <tr><td>AAPL</td><td>10</td><td>1.500</td><td>1.500</td><td>R$ 15.000,00</td><td>R$ 77.250,00</td><td>Não</td></tr>
+    <tr><td>VOO</td><td>5</td><td>500</td><td>500</td><td>R$ 2.500,00</td><td>R$ 12.875,00</td><td>Não</td></tr>
+  </table>
+
+  <h2>6. Diagnóstico final</h2>
+  <h3>Cripto</h3>
+  <p>A causa raiz está em <code>PortfolioPage.jsx</code>: <code>pm = entrada / quantidade</code>. A matemática do custo total é consistente, mas o rótulo do campo induz o usuário ao erro. O comportamento correto deve escolher uma única semântica: “Total Investido” dividido pela quantidade, ou “Preço Médio” salvo diretamente.</p>
+  <h3>EUA/Globais</h3>
+  <p>A causa raiz é a ausência de conversão cambial do <code>pm</code>. <code>assetService.js</code> converte a cotação atual, mas <code>useUpdateQuotes.js</code> não atualiza o preço médio. Depois, <code>calculatePortfolioTotals</code> multiplica quantidade por um valor que pode estar em USD, tratando-o como BRL.</p>
+  <h3>Comportamento recomendado</h3>
+  <pre>Cripto:
+  definir explicitamente se o campo é Total Investido ou Preço Médio.
+
+EUA/Globais:
+  pmBRL = pmUSD × câmbio
+  priceBRL = priceUSD × câmbio
+  custo total = quantidade × pmBRL</pre>
+
+  <h2>Conclusão</h2>
+  <p>Cripto não apresenta duplicação matemática: o custo volta ao total digitado, mas o campo precisa ter semântica clara. EUA/Globais apresentam o problema financeiro relevante: <code>pm</code> não é convertido para BRL, enquanto <code>price</code> pode ser convertido. A correção deve normalizar os dois valores na mesma moeda antes do cálculo do custo total, preservando a moeda original apenas como informação auxiliar quando necessário.</p>
+
+  <footer>Relatório produzido a partir da leitura estática dos fluxos de formulário, persistência, cálculo, atualização de cotações e exibição da tabela.</footer>
+</body>
+</html>

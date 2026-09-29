@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relatório Técnico - Integração de APIs</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm; }
+  :root { --ink:#17212b; --muted:#5d6b78; --line:#d9e0e6; --accent:#087f5b; --soft:#f3f7f5; --warn:#fff6df; }
+  * { box-sizing:border-box; }
+  body { margin:0; color:var(--ink); font-family: "Segoe UI", Arial, sans-serif; font-size:10.5pt; line-height:1.48; }
+  h1 { font-size:25pt; line-height:1.12; margin:0 0 10px; color:#12372d; }
+  h2 { font-size:16pt; margin:24px 0 8px; padding-bottom:4px; border-bottom:2px solid var(--accent); color:#12372d; page-break-after:avoid; }
+  h3 { font-size:12pt; margin:16px 0 5px; color:#145c47; page-break-after:avoid; }
+  p { margin:6px 0 9px; }
+  ul { margin-top:5px; padding-left:20px; }
+  li { margin:3px 0; }
+  code { font-family:Consolas, "Courier New", monospace; font-size:9pt; background:#eef2f4; padding:1px 3px; border-radius:3px; }
+  pre { white-space:pre-wrap; background:#18232b; color:#edf5f2; padding:11px 13px; border-radius:5px; font:8.5pt/1.42 Consolas, "Courier New", monospace; page-break-inside:avoid; }
+  .cover { min-height:245mm; display:flex; flex-direction:column; justify-content:center; border-left:7px solid var(--accent); padding-left:24px; }
+  .eyebrow { color:var(--accent); text-transform:uppercase; letter-spacing:2px; font-weight:700; font-size:9pt; }
+  .subtitle { color:var(--muted); font-size:13pt; max-width:520px; }
+  .meta { margin-top:30px; color:var(--muted); border-top:1px solid var(--line); padding-top:12px; }
+  .box { background:var(--soft); border:1px solid #cfe3da; border-left:4px solid var(--accent); padding:10px 13px; margin:10px 0 14px; page-break-inside:avoid; }
+  .warning { background:var(--warn); border-color:#edd28b; border-left-color:#c28a00; }
+  table { width:100%; border-collapse:collapse; margin:10px 0 15px; font-size:9.5pt; page-break-inside:avoid; }
+  th { text-align:left; background:#e7f1ec; color:#164c3d; }
+  th, td { padding:7px 8px; border:1px solid var(--line); vertical-align:top; }
+  .small { color:var(--muted); font-size:9pt; }
+  .page-break { page-break-before:always; }
+  .footer { margin-top:25px; color:var(--muted); font-size:8.5pt; border-top:1px solid var(--line); padding-top:7px; }
+</style>
+</head>
+<body>
+<section class="cover">
+  <div class="eyebrow">Análise técnica do código</div>
+  <h1>Integração de APIs e Configurações</h1>
+  <p class="subtitle">Estado atual de <code>assetService.js</code>, atualização de ativos e persistência das chaves Brapi, CoinGecko e Alpha Vantage.</p>
+  <div class="meta"><strong>Projeto:</strong> CompraCerta<br><strong>Data:</strong> 16 de setembro de 2026<br><strong>Escopo:</strong> serviços, dispatcher de atualização e componente <code>UserSettingsPage</code></div>
+</section>
+
+<h2>1. Resumo executivo</h2>
+<div class="box warning"><strong>Conclusão principal:</strong> <code>src/services/assetService.js</code>, <code>fetchCoinGeckoData</code> e <code>fetchAssetData</code> não existem atualmente no projeto. A tela já salva as três chaves, mas somente a integração Brapi está efetivamente conectada ao fluxo de atualização.</div>
+<table>
+<tr><th>Serviço</th><th>Campo de configuração</th><th>Chave salva</th><th>Consulta implementada</th><th>Usada na atualização</th></tr>
+<tr><td>Brapi</td><td>Sim</td><td>Sim</td><td>Sim</td><td>Sim</td></tr>
+<tr><td>CoinGecko</td><td>Sim</td><td>Sim</td><td>Não</td><td>Não</td></tr>
+<tr><td>Alpha Vantage</td><td>Sim</td><td>Sim</td><td>Não</td><td>Não</td></tr>
+</table>
+
+<h2>2. Arquivo assetService.js e CoinGecko</h2>
+<p>O arquivo <code>src/services/assetService.js</code> não foi localizado. Também não foram encontradas as funções <code>fetchCoinGeckoData</code> ou qualquer chamada para <code>api.coingecko.com</code>.</p>
+<p>Consequentemente, o código atual:</p>
+<ul><li>não busca o ID <code>bitcoin</code>;</li><li>não utiliza o símbolo <code>btc</code>;</li><li>não envia <code>vs_currency=brl</code>;</li><li>não transforma a resposta CoinGecko em dados de ativo.</li></ul>
+<p>Para Bitcoin, uma implementação CoinGecko normalmente usaria o ID de mercado <code>bitcoin</code>, e não o ticker <code>btc</code>:</p>
+<pre>https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&amp;vs_currencies=brl</pre>
+<p>O parâmetro <code>ids</code> identifica o ativo na CoinGecko. O parâmetro <code>vs_currencies=brl</code> determina que o preço seja retornado em reais.</p>
+
+<h2>3. Dispatcher fetchAssetData</h2>
+<p>A função <code>fetchAssetData</code> não existe. Portanto, não há dispatcher central interceptando o ativo e roteando-o por tipo.</p>
+<p>O fluxo real de atualização individual é:</p>
+<pre>Usuário solicita atualização
+        ↓
+useUpdateQuotes
+        ↓
+fetchBrapiAssetData(asset.ticker)
+        ↓
+Brapi API</pre>
+<p>O hook <code>useUpdateQuotes</code> chama diretamente a Brapi, sem verificar <code>asset.type</code>. Assim, criptomoedas, ações americanas e REITs também seriam encaminhados para a Brapi nesse caminho.</p>
+<p>O roteamento esperado, mas ainda não implementado, seria:</p>
+<table>
+<tr><th>Tipo de ativo</th><th>Serviço esperado</th><th>Estado atual</th></tr>
+<tr><td><code>Cripto</code></td><td>CoinGecko</td><td>Sem serviço implementado</td></tr>
+<tr><td><code>Ação BR</code>, <code>FII</code>, <code>BDR</code>, <code>ETF</code></td><td>Brapi</td><td>Implementado</td></tr>
+<tr><td><code>Stocks</code>, <code>REITs</code></td><td>Alpha Vantage</td><td>Sem serviço implementado</td></tr>
+</table>
+
+<h2>4. Implementação atual da Brapi</h2>
+<p>Em <code>brapiService.js</code>, <code>fetchBrapiAssetData(ticker)</code> busca os fundamentos do ticker, localiza o resultado correspondente e normaliza os dados para o formato interno:</p>
+<pre>{
+  price,
+  dividendYield,
+  pL,
+  pVp,
+  roe,
+  lpa,
+  vpa,
+  growthRate,
+  roic,
+  divEbitda
+}</pre>
+<p>A URL da Brapi é montada com o ticker no caminho e, quando existe uma chave, com o token na query string:</p>
+<pre>https://brapi.dev/api/quote/{ticker}?token={chave}</pre>
+<p>Também existe uma filtragem em <code>updateAssetPrices</code> usando os tipos:</p>
+<pre>new Set(['Ação BR', 'FII', 'ETF', 'BDR'])</pre>
+<p>Essa filtragem não é aplicada no fluxo individual usado por <code>useUpdateQuotes</code>, que chama a Brapi diretamente.</p>
+
+<h2>5. Persistência das chaves</h2>
+<p>As chaves são definidas em <code>src/constants/config.js</code>:</p>
+<pre>BRAPI_API_KEY: 'goes_compra_certa_brapi_api_key'
+COINGECKO_API_KEY: 'goes_compra_certa_coingecko_api_key'
+ALPHA_VANTAGE_API_KEY: 'goes_compra_certa_alpha_vantage_api_key'</pre>
+<p>O componente <code>UserSettingsPage</code> inicializa os estados chamando os respectivos métodos <code>.get()</code>:</p>
+<pre>const [brapiApiKey, setBrapiApiKey] = useState(() =&gt; brapiApiKeyStorage.get());
+const [coinGeckoApiKey, setCoinGeckoApiKey] = useState(() =&gt; coinGeckoApiKeyStorage.get());
+const [alphaVantageApiKey, setAlphaVantageApiKey] = useState(() =&gt; alphaVantageApiKeyStorage.get());</pre>
+<p>Ao salvar o formulário, as três chaves são persistidas conjuntamente:</p>
+<pre>brapiApiKeyStorage.set(brapiApiKey);
+coinGeckoApiKeyStorage.set(coinGeckoApiKey);
+alphaVantageApiKeyStorage.set(alphaVantageApiKey);</pre>
+
+<h2>6. Comportamento do storageService</h2>
+<h3>Brapi</h3>
+<p><code>brapiApiKeyStorage.get()</code> executa <code>localStorage.getItem(STORAGE_KEYS.BRAPI_API_KEY)</code> e retorna string vazia quando não há valor ou ocorre erro.</p>
+<h3>CoinGecko e Alpha Vantage</h3>
+<p>Ambos usam a fábrica <code>createApiKeyStorage(storageKey, providerName)</code>. O método <code>get()</code> lê a chave configurada e retorna <code>''</code> como fallback.</p>
+<p>O método <code>set()</code> converte o valor para string, aplica <code>trim()</code> e:</p>
+<ul><li>salva no <code>localStorage</code> se houver conteúdo;</li><li>remove a chave se o campo estiver vazio;</li><li>retorna sem lançar erro quando o acesso ao armazenamento falha.</li></ul>
+<p>O método <code>clearAllStorage()</code> remove as chaves dos três serviços.</p>
+
+<h2>7. Validação da lógica de atualização</h2>
+<p>Para a lógica funcionar por mercado, ainda será necessário implementar:</p>
+<pre>fetchCoinGeckoData()
+fetchAlphaVantageData()
+fetchAssetData()</pre>
+<p>O dispatcher deverá avaliar o tipo do ativo, chamar o serviço correspondente e normalizar as respostas para o formato interno usado pelo hook.</p>
+<div class="box"><strong>Estado final:</strong> a configuração das chaves está funcionando e persistindo corretamente. A atualização real continua restrita à Brapi; CoinGecko e Alpha Vantage ainda são somente configurações armazenadas.</div>
+<p class="footer">Relatório gerado a partir do estado atual do código-fonte do projeto CompraCerta.</p>
+</body>
+</html>

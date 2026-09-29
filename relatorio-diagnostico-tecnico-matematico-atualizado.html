@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relatório de Diagnóstico Técnico e Matemático Atualizado</title>
+<style>
+@page{size:A4;margin:18mm 17mm}*{box-sizing:border-box}body{font-family:Georgia,'Times New Roman',serif;font-size:10.5pt;line-height:1.43;color:#17202a;margin:0}h1{text-align:center;font-size:20pt;margin:48mm 0 8pt}h2{font-size:14pt;border-bottom:1px solid #9aa4ad;padding-bottom:3pt;margin:18pt 0 7pt;page-break-after:avoid}h3{font-size:11.5pt;margin:12pt 0 4pt;page-break-after:avoid}p{margin:0 0 6pt;text-align:justify}ul,ol{margin-top:3pt;margin-bottom:7pt}li{margin-bottom:3pt}pre{font:8.5pt 'Courier New',monospace;background:#f1f3f5;border:1px solid #d4d9de;padding:7pt;white-space:pre-wrap;page-break-inside:avoid}.cover{text-align:center;page-break-after:always}.meta{text-align:center;color:#4b5563;margin-top:16pt}.status{border-left:4px solid #167447;padding:7pt 10pt;background:#effaf3}.warning{border-left:4px solid #9b1c1c;padding:7pt 10pt;background:#fff5f5}.table{width:100%;border-collapse:collapse;margin:6pt 0 10pt;font-size:9.5pt}.table th,.table td{border:1px solid #aeb7c0;padding:5pt;vertical-align:top}.table th{background:#e9eef2;text-align:left}.small{font-size:9pt;color:#4b5563}
+</style>
+</head>
+<body>
+<section class="cover">
+<h1>RELATÓRIO DE DIAGNÓSTICO TÉCNICO E MATEMÁTICO ATUALIZADO</h1>
+<p><strong>Auditoria do sistema e dos motores quantitativos</strong></p>
+<p class="meta">Quarteto Fantástico: Graham, Bazin, Lynch e Buffett<br>Três Mosqueteiros: Basttter, Baragiola e Caetano</p>
+<p class="meta">Versão posterior às correções de nulos, Cap Rate, períodos de dividendos e ROIC</p>
+<p class="meta">Documento técnico para impressão e salvamento em PDF</p>
+</section>
+
+<h2>1. Sumário Executivo</h2>
+<p>O sistema atual executa dois grupos de motores quantitativos: <em>calculateMasterMethods(asset)</em>, para ações e stocks, e <em>calculateFiiMethods(asset)</em>, para FIIs. Os motores são determinísticos e funcionam como filtros de triagem, não como modelos completos de valuation ou recomendação automatizada.</p>
+<p>As correções recentes foram incorporadas ao diagnóstico:</p>
+<ul>
+<li>Campos fundamentais vazios são preservados como <strong>null</strong> no salvamento do formulário.</li>
+<li>Campos ausentes não são convertidos artificialmente em zero nos fundamentos auditados.</li>
+<li>O Cap Rate ausente, zero ou inválido não recebe mais fallback de 8%; o Baragiola fica indisponível.</li>
+<li>O período selecionado de dividendos não utiliza mais o período oposto como fallback.</li>
+<li>ROIC decimal, como <strong>0,0613</strong>, é normalizado para <strong>6,13%</strong>.</li>
+</ul>
+<div class="status"><strong>Parecer executivo:</strong> após as correções, o estado atual é mais fiel à ausência real de dados e reduz falsos cálculos. Permanecem limitações de modelo: thresholds fixos, ausência de fluxo de caixa livre, ausência de Capex e dependência de premissas simplificadas.</div>
+
+<h2>2. Escopo e arquitetura auditada</h2>
+<p>O fluxo auditado é:</p>
+<pre>AssetForm.jsx
+  -> PortfolioPage.jsx: parsing e persistência
+  -> useAssets/storageService: estado e localStorage
+  -> páginas de análise
+  -> calculationService.js: normalização e regras quantitativas
+  -> MethodCard.jsx: semáforo e apresentação</pre>
+<p>A atualização de cotações pela Brapi altera preço e, quando disponíveis, alguns fundamentos de ações. Valores recebidos como nulos ou inválidos podem preservar os valores já existentes no ativo.</p>
+
+<h2>3. Mapeamento de Variáveis Atualizado</h2>
+<table class="table">
+<tr><th>Motor</th><th>Campos de entrada efetivamente usados</th><th>Campos não usados no cálculo</th></tr>
+<tr><td>Graham</td><td><em>lpa</em>, <em>vpa</em>, <em>price</em>, <em>pm</em></td><td><em>qty</em>, <em>ticker</em>, DY, P/L, P/VP, ROE, crescimento, ROIC, Dívida/EBITDA, meta</td></tr>
+<tr><td>Bazin</td><td><em>price</em>, <em>dividendYield</em></td><td><em>pm</em>, LPA, VPA, crescimento, ROIC, Dívida/EBITDA</td></tr>
+<tr><td>Lynch</td><td><em>lpa</em>, <em>growthRate</em>, <em>price</em></td><td><em>pm</em>, VPA, DY, ROIC, Dívida/EBITDA</td></tr>
+<tr><td>Buffett</td><td><em>roic</em>, <em>divEbitda</em></td><td>Preço, preço médio, LPA, VPA, crescimento, DY</td></tr>
+<tr><td>Basttter</td><td><em>pVpAjustado</em> ou <em>pVp</em>, <em>alavancagem</em></td><td>Preço, DY, Cap Rate, vacância, concentração, liquidez, patrimônio</td></tr>
+<tr><td>Baragiola</td><td><em>price</em>, dividendos do período selecionado, <em>dividendYieldRecorrente</em> como fallback, <em>capRate</em></td><td>P/VP, alavancagem, vacância, concentração, liquidez, patrimônio</td></tr>
+<tr><td>Caetano</td><td><em>vacancia</em> ou <em>vacancy</em>, <em>capRate</em>, <em>concentracao</em>, <em>liquidezDiaria</em></td><td>Preço, DY, dividendos, P/VP, patrimônio, preço médio</td></tr>
+</table>
+<p>Campos comuns como <em>ticker</em>, <em>qty</em> e <em>meta</em> identificam ou controlam a posição, mas não alimentam os motores auditados. O patrimônio dos FIIs é exibido na tela, mas não participa das decisões dos três métodos.</p>
+
+<h2>4. Regras Matemáticas Estritas</h2>
+<h3>4.1 Graham</h3>
+<pre>valorGraham = sqrt(22,5 * LPA * VPA)
+aprovado = (price &lt;= valorGraham) AND (pm &lt;= valorGraham)</pre>
+<p>LPA, VPA, preço e preço médio precisam ser positivos. Se qualquer entrada necessária estiver ausente, o método retorna <strong>null</strong>. A fórmula do valor é a versão simplificada de Graham; a exigência adicional do preço médio é uma regra específica da aplicação.</p>
+<h3>4.2 Bazin</h3>
+<pre>DY_normalizado = DY / 100, quando DY &gt; 1; caso contrário, DY
+DPA = price * DY_normalizado
+precoTeto = DPA / 0,06
+aprovado = price &lt;= precoTeto</pre>
+<p>Preço e DY ausentes tornam o método indisponível. A taxa de 6% é fixa. O DPA é reconstruído a partir da cotação atual, portanto não é necessariamente um dividendo histórico independente.</p>
+<h3>4.3 Lynch</h3>
+<pre>crescimento = growthRate * 100, quando growthRate &lt;= 1; caso contrário, growthRate
+valorJusto = LPA * crescimento
+aprovado = price &lt; valorJusto</pre>
+<p>LPA, crescimento e preço precisam existir em valores positivos. A regra é uma aproximação do conceito de crescimento e não implementa PEG, duração do crescimento, risco, payout ou Capex.</p>
+<h3>4.4 Buffett</h3>
+<pre>ROIC_normalizado = ROIC * 100, quando ROIC &lt;= 1; caso contrário, ROIC
+criterioROIC = ROIC_normalizado &gt;= 8
+criterioDivida = divEbitda &lt;= 3
+aprovado = criterioROIC AND criterioDivida</pre>
+<p>ROIC ou Dívida/EBITDA ausentes tornam o card indisponível. O valor armazenado e exibido pelo método é o ROIC normalizado. O modelo é um filtro de qualidade, não um cálculo de valor intrínseco.</p>
+<h3>4.5 Normalização de dividendos dos FIIs</h3>
+<pre>período selecionado = 24M -> 24M; qualquer outro valor -> 12M
+se 12M: valor = dividendo12m OU dyHistorico12M
+se 24M: valor = dividendo24m OU dyHistorico12M
+se nenhum existir: valor = null</pre>
+<p>O período oposto nunca é usado. Assim, 12M não utiliza <em>dividendo24m</em> e 24M não utiliza <em>dividendo12m</em>. O histórico de 12M continua sendo fallback explícito para ambos os períodos, conforme a implementação atual.</p>
+<h3>4.6 Base do preço-teto dos FIIs</h3>
+<pre>taxaReferencia = capRate / 100, se capRate &gt; 0; caso contrário, null
+yield = dividendo do período selecionado OU DY recorrente
+rendimentoAnual = price * yield_normalizado
+precoTeto = rendimentoAnual / taxaReferencia, somente se taxaReferencia existir</pre>
+<p>Não existe mais fallback automático de 8%. Sem Cap Rate válido, o Baragiola retorna <strong>null</strong> e o card exibe <strong>“Cap Rate não informado”</strong>.</p>
+<h3>4.7 Basttter</h3>
+<pre>criterioPVP = pVpAjustado &lt;= 1
+criterioAlavancagem = alavancagem &lt; 10
+aprovado = ambos verdadeiros</pre>
+<p>Dois critérios aprovados produzem verde; um falho produz amarelo; dois falhos produzem vermelho. P/VP igual a 1 aprova; alavancagem igual a 10 reprova.</p>
+<h3>4.8 Baragiola</h3>
+<pre>aprovado = price &lt;= precoTeto</pre>
+<p>É um único critério, logo não possui estado amarelo. Sem preço, rendimento válido ou Cap Rate válido, o método retorna <strong>null</strong>.</p>
+<h3>4.9 Caetano</h3>
+<pre>vacancia &lt; 10
+capRate &gt;= 7
+concentracao &lt; 25
+liquidezDiaria &gt; 50000
+aprovado = os quatro critérios verdadeiros</pre>
+<p>O semáforo é verde com quatro critérios aprovados, amarelo com exatamente um falho e vermelho com dois ou mais falhos. Os limites são estritos conforme indicado.</p>
+
+<h2>5. Tratamento Atual de Nulos e Zero</h2>
+<p>O formulário utiliza parsing opcional para campos fundamentais. Entradas vazias, nulas ou inválidas resultam em <strong>null</strong>, não em zero. Isso se aplica a DY, P/L, P/VP, ROE, LPA, VPA, crescimento, ROIC, Dívida/EBITDA, DY recorrente, P/VP ajustado, vacância e Cap Rate.</p>
+<p>Nos motores, campos dependentes de dados positivos utilizam leitura positiva; campos opcionais utilizam leitura numérica que preserva ausência como <strong>null</strong>. Um zero econômico real pode continuar sendo distinguido de ausência quando o campo é aceito como opcional, mas não habilita fórmulas que exigem domínio positivo.</p>
+<div class="warning"><strong>Limite remanescente:</strong> quantidade, preço de entrada, meta e alguns campos cadastrais ainda possuem defaults próprios de carteira. Esses defaults não alimentam os critérios dos motores auditados, exceto o preço médio quando informado e necessário para Graham.</div>
+
+<h2>6. Desvios, Limitações e Premissas Econômicas</h2>
+<ul>
+<li>As fórmulas são filtros simplificados e não substituem valuation por fluxo de caixa descontado.</li>
+<li>Não há cálculo de fluxo de caixa livre, Capex de manutenção, capital de giro ou reinvestimento.</li>
+<li>O Bazin pode interpretar distribuição extraordinária como renda sustentável.</li>
+<li>O Lynch pode transformar crescimento caro em valor justo sem medir o capital necessário para financiá-lo.</li>
+<li>O Buffett não avalia estabilidade histórica, vantagem competitiva, custo da dívida ou adequação setorial do EBITDA.</li>
+<li>O preço-teto dos FIIs usa rendimento corrente e uma taxa baseada no Cap Rate, sem projeção de aluguéis, inadimplência, reformas ou vacância futura.</li>
+<li>Thresholds fixos podem ser inadequados para bancos, seguradoras, holdings, fundos de recebíveis, fundos de desenvolvimento e estruturas híbridas.</li>
+<li>A interpretação percentual/decimal ainda é heurística em alguns indicadores; o ROIC agora possui normalização explícita.</li>
+<li>Dados da API podem ter datas diferentes dos dados manuais preservados no ativo.</li>
+</ul>
+<h3>Impacto de Capex e reinvestimento</h3>
+<p>Empresas de crescimento podem distribuir pouco porque reinvestem capital em projetos produtivos. Isso não é distinguido de baixa qualidade pelo Bazin. No Lynch, crescimento sem custo de reinvestimento pode superestimar o valor. No Buffett, ROIC isolado não mede a necessidade de Capex para manter ou expandir a operação. Nos FIIs, obras, retrofit e manutenção podem reduzir o caixa distribuível, mas não são deduzidos do rendimento usado no preço-teto.</p>
+
+<h2>7. Status de Validação e Testes Unitários</h2>
+<p>Foi executado teste comportamental direto dos exports de <em>calculationService.js</em> com asserts para os quatro ajustes recentes.</p>
+<table class="table">
+<tr><th>Cenário</th><th>Entrada</th><th>Resultado esperado</th><th>Status</th></tr>
+<tr><td>ROIC ausente</td><td><em>roic: null</em>, Dívida/EBITDA válida</td><td>Buffett = <em>null</em>, card de dados insuficientes</td><td><strong>PASSOU</strong></td></tr>
+<tr><td>ROIC decimal</td><td><em>roic: 0.0613</em></td><td>ROIC normalizado = 6,13%; falha no limiar de 8%</td><td><strong>PASSOU</strong></td></tr>
+<tr><td>Cap Rate ausente</td><td><em>capRate: null</em></td><td>Baragiola = <em>null</em>, sem cálculo a 8%</td><td><strong>PASSOU</strong></td></tr>
+<tr><td>Cap Rate zero</td><td><em>capRate: 0</em></td><td>Baragiola = <em>null</em></td><td><strong>PASSOU</strong></td></tr>
+<tr><td>12M sem dividendo 12M</td><td><em>dyPeriod: '12M'</em>, apenas 24M preenchido</td><td>valor selecionado = <em>null</em></td><td><strong>PASSOU</strong></td></tr>
+<tr><td>24M sem dividendo 24M</td><td><em>dyPeriod: '24M'</em>, apenas 12M preenchido</td><td>valor selecionado = <em>null</em></td><td><strong>PASSOU</strong></td></tr>
+<tr><td>Build de produção</td><td><em>npm run build</em></td><td>compilação concluída sem erro</td><td><strong>PASSOU</strong></td></tr>
+</table>
+<p class="small">O build mantém apenas o aviso de tamanho de chunks acima de 500 kB; não houve erro de compilação.</p>
+
+<h2>8. Parecer Final</h2>
+<p>Com as correções incorporadas, o sistema deixou de mascarar determinados dados ausentes como zero, deixou de inventar uma taxa de 8% para o Cap Rate e deixou de misturar automaticamente dividendos de 12M e 24M. O ROIC agora é comparável em escala percentual quando recebido como decimal.</p>
+<p>O conjunto permanece adequado como ferramenta de triagem e organização de indicadores, mas suas saídas devem ser interpretadas dentro das premissas e limitações descritas. A ausência de Capex, fluxo de caixa livre, sustentabilidade dos proventos, risco setorial e projeções econômicas impede que os resultados sejam considerados valuation completo.</p>
+<p style="margin-top:14pt"><strong>Registro de integridade:</strong> este relatório descreve o estado atualizado observado no código. A geração deste documento não altera os motores da aplicação.</p>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yahoo Finance - Código do módulo</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 32px;
+      color: #111827;
+      line-height: 1.5;
+    }
+    h1, h2, h3 {
+      color: #111827;
+    }
+    pre {
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+    }
+    .label {
+      font-weight: bold;
+      margin-top: 18px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Yahoo Finance - Módulo de busca de cotações americanas</h1>
+
+  <p>Este módulo foi implementado em Node no backend do projeto e consulta a API pública estável do Yahoo Finance.</p>
+
+  <div class="label">Trecho completo:</div>
+  <pre><code>const normalizeYahooSymbol = (value) => String(value || '')
+  .trim()
+  .toUpperCase()
+  .replace(/\s+/g, '')
+  .replace(/\./g, '-')
+  .replace(/-+/g, '-');
+
+const handleYahooRequest = async (request, response) => {
+  const requestUrl = new URL(request.url, `http://${request.headers.host}`);
+  const symbol = normalizeYahooSymbol(requestUrl.searchParams.get('symbol'));
+
+  if (!symbol || !/^[A-Z0-9.^=-]+$/.test(symbol)) {
+    sendJson(response, 400, { error: 'Ticker Yahoo Finance inválido.' });
+    return;
+  }
+
+  try {
+    const yahooUrl = new URL(`${YAHOO_BASE_URL}/${encodeURIComponent(symbol)}`);
+    yahooUrl.searchParams.set('range', '1d');
+    yahooUrl.searchParams.set('interval', '1d');
+    yahooUrl.searchParams.set('events', 'div,splits');
+
+    const upstream = await fetch(yahooUrl, {
+      headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0' }
+    });
+
+    if (!upstream.ok) {
+      const status = upstream.status === 404 ? 404 : 502;
+      const message = upstream.status === 404
+        ? `Ticker ${symbol} não encontrado no Yahoo Finance.`
+        : `Yahoo Finance HTTP ${upstream.status}`;
+      sendJson(response, status, { error: message, code: upstream.status === 404 ? 'TICKER_NOT_FOUND' : 'UPSTREAM_ERROR' });
+      return;
+    }
+
+    const payload = await upstream.json();
+    const result = payload?.chart?.result?.[0];
+    const price = Number(result?.meta?.regularMarketPrice ?? result?.indicators?.quote?.[0]?.close?.at(-1));
+
+    if (!Number.isFinite(price) || price <= 0) {
+      sendJson(response, 502, { error: 'Yahoo Finance retornou uma cotação inválida.' });
+      return;
+    }
+
+    sendJson(response, 200, { symbol, price, currency: result?.meta?.currency || 'USD' });
+  } catch (error) {
+    sendJson(response, 502, { error: error.message || 'Falha ao consultar o Yahoo Finance.' });
+  }
+};</code></pre>
+
+  <div class="label">Linha de normalização e envio do ticker:</div>
+  <pre><code>const symbol = normalizeYahooSymbol(requestUrl.searchParams.get('symbol'));
+const yahooUrl = new URL(`${YAHOO_BASE_URL}/${encodeURIComponent(symbol)}`);</code></pre>
+
+  <div class="label">Validação executada:</div>
+  <pre><code>AAPL: HTTP 200 {"symbol":"AAPL","price":336.13,"currency":"USD"}
+BRK.B: HTTP 200 {"symbol":"BRK-B","price":509.77,"currency":"USD"}
+DOES-NOT-EXIST-XYZ: HTTP 404 {"error":"Ticker DOES-NOT-EXIST-XYZ não encontrado no Yahoo Finance.","code":"TICKER_NOT_FOUND"}</code></pre>
+</body>
+</html>

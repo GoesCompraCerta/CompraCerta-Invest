@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Análise de Cotações e Cálculos de Ativos EUA</title>
+<style>
+@page { size: A4; margin: 17mm 15mm; }
+* { box-sizing: border-box; }
+body { font-family: Arial, sans-serif; color:#17202a; line-height:1.46; font-size:10.3pt; }
+h1 { color:#123b5d; font-size:23pt; margin:0 0 5px; }
+h2 { color:#123b5d; font-size:15pt; border-bottom:1px solid #cbd8e0; padding-bottom:4px; margin:22px 0 10px; }
+h3 { color:#245b75; font-size:12pt; margin:17px 0 7px; }
+.subtitle { color:#5f6d75; margin:0 0 20px; }
+code { font-family:Consolas, monospace; background:#eef3f6; padding:1px 3px; }
+pre { background:#172b3a; color:#f4f7f8; padding:10px 12px; border-radius:5px; white-space:pre-wrap; font:8.3pt/1.4 Consolas, monospace; }
+.note { background:#fff5df; border-left:4px solid #d18b16; padding:9px 12px; }
+.good { background:#eaf4f5; border-left:4px solid #2b7a78; padding:9px 12px; }
+table { border-collapse:collapse; width:100%; margin:9px 0 13px; }
+th,td { border:1px solid #ccd6dc; padding:6px 8px; text-align:left; vertical-align:top; }
+th { background:#eaf0f4; }
+.small { color:#5f6d75; font-size:8.5pt; }
+</style>
+</head>
+<body>
+<h1>Análise de Cotações e Cálculos</h1>
+<p class="subtitle">Ativos brasileiros versus Ações EUA, REITs EUA e ETFs EUA</p>
+
+<h2>1. Fluxo de atualização de cotações</h2>
+<p>O botão da tabela chama <code>useUpdateQuotes</code>, que encaminha cada ativo para <code>fetchAssetData</code>.</p>
+<pre>const incoming = await fetchAssetData(asset);
+
+const mergedUpdates = {
+  price: incoming.price ?? asset.price,
+  priceOriginal: incoming.priceOriginal ?? asset.priceOriginal ?? null,
+  priceCurrency: incoming.priceCurrency ?? asset.priceCurrency ?? 'BRL'
+};</pre>
+<p>Ativos BR seguem para a Brapi. Ativos EUA seguem para a Alpha Vantage:</p>
+<pre>if (
+  type.includes('eua') ||
+  type.includes('internacional') ||
+  type.includes('reit') ||
+  type.includes('etf internacional') ||
+  type.includes('global')
+) {
+  return fetchAlphaVantageData(asset.ticker, asset.moeda || 'USD');
+}
+
+return fetchBrapiAssetData(asset.ticker);</pre>
+
+<h2>2. Por que EUA retorna “Erro ao buscar cotações”</h2>
+<p>A chamada para a Alpha Vantage é:</p>
+<pre>const params = new URLSearchParams({
+  function: 'GLOBAL_QUOTE',
+  symbol: String(ticker || '').trim()
+});
+
+const response = await fetch(
+  `https://www.alphavantage.co/query?${params.toString()}`
+);
+
+const data = await response.json();
+const quote = data?.['Global Quote'];
+const originalPrice = Number(quote?.['05. price']);</pre>
+<p>O código exige a resposta <code>Global Quote → 05. price</code>. Quando a Alpha Vantage devolve limite excedido, chave demo, ticker inválido ou resposta informativa, essa estrutura não existe:</p>
+<pre>if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
+  throw new Error(
+    'Alpha Vantage: dados indisponíveis ou limite de requisições atingido'
+  );
+}</pre>
+<p>O erro então é capturado e convertido na mensagem genérica da interface:</p>
+<pre>catch (err) {
+  console.error('Update quotes error:', err);
+  setUpdateMsg(t.erroCotacoes);
+}</pre>
+<div class="note"><strong>Diagnóstico:</strong> o roteamento por tipo está correto. O problema mais provável é a resposta da Alpha Vantage, a chave/limite da API ou um ticker com sufixo incompatível. A quantidade de cotas não participa do fetch.</div>
+
+<h2>3. Ticker e conversão cambial</h2>
+<p>O ticker é apenas removido de espaços:</p>
+<pre>symbol: String(ticker || '').trim()</pre>
+<p>O formulário costuma salvar o ticker em maiúsculas, mas a função não remove explicitamente sufixos como <code>.US</code>, <code>:US</code> ou outras extensões. Tickers simples como <code>AAPL</code>, <code>MSFT</code> e <code>AMZN</code> são o formato esperado.</p>
+<p>A conversão ocorre somente depois de obter a cotação:</p>
+<pre>const rates = await fetchExchangeRates();
+const rate = rates[currency.toLowerCase()];
+
+if (Number.isFinite(rate) && rate > 0) {
+  priceBrl = originalPrice * rate;
+} else {
+  throw new Error(`Exchange rate for ${currency} was not found`);
+}</pre>
+<p>Assim, câmbio não altera o ticker. Porém, se o câmbio falhar, a atualização também termina em erro para ativos estrangeiros.</p>
+
+<h2>4. Cálculo de custo, valor atual e lucro</h2>
+<p>O cálculo está em <code>src/services/calculationService.js</code>:</p>
+<pre>const quantity = Number(item.qty) || 0;
+const currentUnitPrice = Number(item.price) || 0;
+const averageUnitPrice = Number(item.pm) || 0;
+
+const valorTotal = quantity * currentUnitPrice;
+
+const valorInvestido = isCrypto(item.type, item.ticker)
+  ? averageUnitPrice
+  : quantity * averageUnitPrice;
+
+const lucro = valorTotal - valorInvestido;</pre>
+<p>Para Ações EUA, REITs EUA e ETFs EUA, o ativo não é cripto. Portanto:</p>
+<div class="good"><strong>Valor Atual</strong> = Quantidade × Cotação Atual unitária em BRL<br><strong>Custo Total</strong> = Quantidade × Preço Médio unitário em BRL<br><strong>Lucro/Prejuízo</strong> = Valor Atual − Custo Total</div>
+
+<h2>5. Exemplo com duas cotas</h2>
+<pre>Quantidade:              2
+Preço Médio unitário:   R$ 100,00
+Cotação Atual unitária: R$ 120,00</pre>
+<pre>Custo Total = 2 × 100 = R$ 200,00
+Valor Atual = 2 × 120 = R$ 240,00
+Lucro      = 240 − 200 = R$ 40,00</pre>
+<p>Com cotação atual de R$ 80,00:</p>
+<pre>Custo Total = 2 × 100 = R$ 200,00
+Valor Atual = 2 × 80  = R$ 160,00
+Prejuízo    = 160 − 200 = -R$ 40,00</pre>
+
+<h2>6. Onde pode parecer haver duplicação</h2>
+<p>A tabela exibe <code>item.pm</code> e <code>item.price</code> como valores unitários, enquanto <code>item.valorTotal</code> já é o total:</p>
+<pre>&lt;td&gt;{formatMoney(item.pm)}&lt;/td&gt;
+&lt;td&gt;{formatMoney(item.price)}&lt;/td&gt;
+&lt;td&gt;{formatMoney(item.valorTotal)}&lt;/td&gt;
+&lt;td&gt;{formatMoney(item.lucro)}&lt;/td&gt;</pre>
+<p>Se o campo <code>pm</code> for salvo incorretamente como custo total, a fórmula correta parecerá duplicar o valor:</p>
+<pre>Quantidade = 2
+pm salvo incorretamente = R$ 200,00
+
+Custo calculado = 2 × 200 = R$ 400,00</pre>
+<p>O valor correto seria salvar <code>pm = R$ 100,00</code> e deixar o cálculo produzir <code>2 × 100 = R$ 200,00</code>.</p>
+<div class="good"><strong>Conclusão:</strong> na versão atual não há inversão do sinal do lucro nem multiplicação dupla dentro da fórmula para ativos EUA. A fórmula é correta, mas depende de <code>pm</code> e <code>price</code> serem valores unitários em BRL. O erro de atualização EUA está separado do cálculo e ocorre principalmente na resposta da Alpha Vantage, no ticker aceito ou na conversão cambial.</div>
+<p class="small">Documento gerado a partir da análise estática do código atual do projeto CompraCerta.</p>
+</body>
+</html>

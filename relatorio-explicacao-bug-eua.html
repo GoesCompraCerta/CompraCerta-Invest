@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Relatório de Depuração — Ativos EUA / Alpha Vantage / Cálculo de Quantidade</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+        max-width: 850px;
+        margin: 0 auto;
+        padding: 36px 42px;
+        color: #111827;
+        line-height: 1.65;
+        background: #ffffff;
+      }
+      h1, h2, h3 { color: #0f172a; }
+      h1 { font-size: 30px; line-height: 1.2; margin-bottom: 12px; }
+      h2 { font-size: 23px; line-height: 1.3; margin-top: 32px; margin-bottom: 12px; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }
+      h3 { font-size: 18px; margin-top: 18px; margin-bottom: 8px; }
+      p, li { font-size: 16px; }
+      ol, ul { padding-left: 28px; }
+      code, pre {
+        font-family: Consolas, "Courier New", monospace;
+        background: #f3f4f6;
+        border-radius: 6px;
+      }
+      code { font-size: 0.9em; padding: 2px 4px; }
+      pre {
+        padding: 16px 18px;
+        border: 1px solid #e5e7eb;
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+        font-size: 14px;
+        line-height: 1.5;
+        page-break-inside: avoid;
+      }
+      .meta {
+        color: #475569;
+        font-size: 14px;
+        margin-bottom: 24px;
+      }
+      .box {
+        border-left: 4px solid #0ea5e9;
+        background: #f0f9ff;
+        padding: 16px 18px;
+        margin: 14px 0;
+        page-break-inside: avoid;
+      }
+      .warning {
+        border-left: 4px solid #f59e0b;
+        background: #fff7ed;
+        padding: 16px 18px;
+        margin: 14px 0;
+        page-break-inside: avoid;
+      }
+      @page {
+        size: A4;
+        margin: 18mm 16mm;
+      }
+      @media print {
+        body { max-width: none; padding: 0; }
+        h1 { font-size: 26px; }
+        h2 { break-after: avoid; }
+        p, li { font-size: 14px; }
+        pre { font-size: 11px; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Relatório Técnico — Depuração de Ativos EUA / Alpha Vantage / Cálculo de Quantidade</h1>
+    <div class="meta">Gerado para análise técnica e exportação em PDF.</div>
+
+    <h2>1) Onde a atualização de cotação dos EUA está sendo executada</h2>
+    <p>O fluxo real do projeto atual é:</p>
+    <ol>
+      <li><strong>App dispara o refresh</strong> em <code>src/App.jsx</code>, onde a prop <code>onUpdateQuote</code> chama <code>handleUpdateAsset(asset, t, onSuccess)</code>.</li>
+      <li><strong>Interception / execução real</strong> em <code>src/hooks/useUpdateQuotes.js</code>.</li>
+      <li><strong>Rota de busca por tipo de ativo</strong> em <code>src/services/assetService.js</code>.</li>
+    </ol>
+
+    <pre>src/App.jsx
+  onUpdateQuote={(asset, onSuccess) => handleUpdateAsset(asset, t, onSuccess)}</pre>
+
+    <pre>src/hooks/useUpdateQuotes.js
+  const incoming = await fetchAssetData(asset);
+  const mergedUpdates = {
+    price: incoming.price ?? asset.price,
+    priceOriginal: incoming.priceOriginal ?? asset.priceOriginal ?? null,
+    priceCurrency: incoming.priceCurrency ?? asset.priceCurrency ?? 'BRL',
+    dividendYield: preserveExistingValue(incoming.dividendYield, asset.dividendYield),
+    ...
+  };
+  onSuccess(asset.id, mergedUpdates);</pre>
+
+    <pre>src/services/assetService.js
+  if (
+    type.includes('eua') ||
+    type.includes('internacional') ||
+    type.includes('reit') ||
+    type.includes('etf internacional') ||
+    type.includes('global')
+  ) {
+    return fetchAlphaVantageData(ticker, asset.moeda || 'USD');
+  }</pre>
+
+    <p>É aqui que a requisição da Alpha Vantage realmente acontece:</p>
+    <pre>const params = new URLSearchParams({
+  function: 'GLOBAL_QUOTE',
+  symbol,
+  apikey: apiKey
+});
+
+const response = await fetch(`https://www.alphavantage.co/query?${params.toString()}`, {
+  headers: { Accept: 'application/json' }
+});</pre>
+
+    <h2>2) Por que a Alpha Vantage continua falhando</h2>
+    <p>A chave da API não está “se perdendo” em um contexto/global invisível. A leitura atual está explícita em <code>src/services/assetService.js</code>:</p>
+    <pre>const getAlphaVantageApiKey = () => {
+  const configuredKey = typeof import.meta !== 'undefined' && import.meta.env
+    ? import.meta.env.VITE_ALPHA_VANTAGE_API_KEY
+    : '';
+
+  return configuredKey || getStorageKey('goes_compra_certa_alpha_vantage_api_key');
+};</pre>
+
+    <p>A chave é salva em settings em <code>src/pages/UserSettingsPage.jsx</code>:</p>
+    <pre>alphaVantageApiKeyStorage.set(alphaVantageApiKey);</pre>
+
+    <p>O storage usa a chave do projeto:</p>
+    <pre>src/constants/config.js
+  ALPHA_VANTAGE_API_KEY: 'goes_compra_certa_alpha_vantage_api_key'</pre>
+
+    <div class="box">
+      <strong>Ponto crítico:</strong> a falha real não é “contexto perdido”. Ela acontece quando a API devolve vazio, informa que a chave está inválida, ou não entrega <code>Global Quote -> 05. price</code>.
+    </div>
+
+    <pre>const quote = data?.['Global Quote'];
+const originalPrice = Number(quote?.['05. price']);
+
+if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
+  console.warn(`[AlphaVantage] Cotação inválida para ${symbol}.`);
+  return null;
+}</pre>
+
+    <p>Além disso, esse bloco também bloqueia quando a resposta vem com <code>Note</code>, <code>Information</code> ou <code>Error Message</code>:</p>
+    <pre>if (data?.Note || data?.Information || data?.['Error Message']) {
+  console.warn('[AlphaVantage] Resposta informativa:', ...);
+  return null;
+}</pre>
+
+    <div class="warning">
+      <strong>Conclusão:</strong> o código não está “quebrando” no meio do caminho; ele está devolvendo <code>null</code> porque a resposta da API não atende ao contrato esperado. A UI então só mostra erro genérico, mas o ponto exato do problema é a resposta da Alpha Vantage / ausência de chave válida.
+    </div>
+
+    <h2>3) Como o cálculo de valorInvestido e valorTotal está sendo feito</h2>
+    <p>O cálculo atual está em <code>src/services/calculationService.js</code>:</p>
+    <pre>const quantity = Number(item.qty) || 0;
+const currentUnitPrice = Number(item.price) || 0;
+const averageUnitPrice = Number(item.pm) || 0;
+const valorTotal = quantity * currentUnitPrice;
+const valorInvestido = isCrypto(item.type, item.ticker)
+  ? averageUnitPrice
+  : quantity * averageUnitPrice;
+const lucro = valorTotal - valorInvestido;</pre>
+
+    <p>Para um ativo com quantidade = 2, a regra exata é:</p>
+    <pre>valorTotal = 2 * item.price
+valorInvestido = 2 * item.pm   // para ativos não cripto
+lucro = valorTotal - valorInvestido</pre>
+
+    <p>Exemplo numérico:</p>
+    <pre>item.qty = 2
+item.pm = 100
+item.price = 120
+
+valorTotal = 2 * 120 = 240
+valorInvestido = 2 * 100 = 200
+lucro = 240 - 200 = 40</pre>
+
+    <p>Ou seja, o sistema calcula o custo e o valor atual multiplicando pela quantidade, e não por “um único preço” sem quantidade.</p>
+
+    <h2>4) De onde vem o valor de pm no banco de dados</h2>
+    <p>O <code>pm</code> vem diretamente do array de ativos lido do localStorage, em <code>src/hooks/useAssets.js</code> e <code>src/services/storageService.js</code>:</p>
+    <pre>src/hooks/useAssets.js
+  const [assets, setAssets] = useState(() => assetsStorage.get());</pre>
+
+    <pre>src/services/storageService.js
+  const saved = localStorage.getItem(STORAGE_KEYS.ASSETS);
+  return saved ? JSON.parse(saved) : [];</pre>
+
+    <pre>src/constants/config.js
+  ASSETS: 'goes_compra_certa_assets'</pre>
+
+    <p>Portanto, o valor de <code>item.pm</code> que o cálculo usa é exatamente o valor persistido em:</p>
+    <pre>localStorage['goes_compra_certa_assets'] -> asset.pm</pre>
+
+    <div class="warning">
+      <strong>Se esse campo estiver corrompido como total em vez de unitário, o cálculo fica distorcido exatamente como você está vendo na tela.</strong>
+    </div>
+
+    <h2>5) Ponto exato do bug ancorado</h2>
+    <ul>
+      <li><strong>Atualização de cotação EUA:</strong> <code>src/hooks/useUpdateQuotes.js</code> + <code>src/services/assetService.js</code></li>
+      <li><strong>Falha da Alpha Vantage:</strong> a resposta da API não atende ao contrato esperado; código retorna <code>null</code> e a UI só exibe erro genérico</li>
+      <li><strong>Cálculo de quantidade e pm:</strong> <code>src/services/calculationService.js</code> usa o <code>pm</code> diretamente salvo em localStorage</li>
+    </ul>
+
+    <p>Em resumo: não há “outra lógica secreta”; o bug está ancorado no ponto exato em que:</p>
+    <ol>
+      <li>a API de cotações dos EUA retorna payload inválido;</li>
+      <li>o código trata isso como falha e interrompe a atualização;</li>
+      <li>o cálculo de lucros usa o <code>pm</code> persistido no armazenamento do app, sem correção defensiva de dados corrompidos.</li>
+    </ol>
+  </body>
+</html>
