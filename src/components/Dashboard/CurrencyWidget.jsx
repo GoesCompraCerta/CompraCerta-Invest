@@ -38,7 +38,7 @@ export default function CurrencyWidget() {
     setError('');
 
     try {
-      const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL');
+      const response = await fetch('/api/exchange-rates');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data = await response.json();

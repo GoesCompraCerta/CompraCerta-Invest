@@ -118,3 +118,14 @@ export const getPlanStatus = async () => {
     throw error;
   }
 };
+
+export const activateProForTest = async (plan) => {
+  const token = getToken();
+  if (!token) throw new Error('Sessão não encontrada.');
+
+  return request('/api/auth/activate-pro', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ plan })
+  });
+};

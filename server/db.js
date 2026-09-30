@@ -138,6 +138,13 @@ export const initDb = async () => {
     ) ENGINE=InnoDB
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS mercadopago_webhook_events (
+      event_id VARCHAR(255) NOT NULL PRIMARY KEY,
+      processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB
+  `);
+
   await migrateSqliteData();
 };
 
@@ -162,6 +169,46 @@ export const createUser = async ({ name, email, passwordHash, trialStartedAt, pl
 export const getUserById = async (id) => {
   const [rows] = await db.execute('SELECT * FROM users WHERE id = ?', [id]);
   return rows[0];
+};
+
+export const updateUserPlan = async (userId, planExpiresAt) => {
+  const [result] = await db.execute(
+    'UPDATE users SET plan = ?, plan_expires_at = ? WHERE id = ?',
+    ['pro', planExpiresAt, userId]
+  );
+  return result.affectedRows > 0;
+};
+
+export const activateUserPlanFromWebhook = async (eventId, userId, planExpiresAt) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [eventResult] = await connection.execute(
+      'INSERT IGNORE INTO mercadopago_webhook_events (event_id) VALUES (?)',
+      [eventId]
+    );
+    if (eventResult.affectedRows === 0) {
+      await connection.commit();
+      return { duplicate: true, updated: false };
+    }
+
+    const [userResult] = await connection.execute(
+      'UPDATE users SET plan = ?, plan_expires_at = ? WHERE id = ?',
+      ['pro', planExpiresAt, userId]
+    );
+    if (userResult.affectedRows === 0) {
+      await connection.rollback();
+      return { duplicate: false, updated: false };
+    }
+
+    await connection.commit();
+    return { duplicate: false, updated: true };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 };
 
 export const getAssetsByUserId = async (userId) => {

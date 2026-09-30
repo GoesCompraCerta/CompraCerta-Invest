@@ -399,6 +399,8 @@ export default function App() {
         {activeTab === 'configuracoes' && (
           <UserSettingsPage
             t={t}
+            planStatus={planStatus}
+            setPlanStatus={setPlanStatus}
             lang={lang}
             setLang={setLang}
             isDarkMode={isDarkMode}

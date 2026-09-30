@@ -1,12 +1,13 @@
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import YahooFinance from 'yahoo-finance2';
 import {
+  activateUserPlanFromWebhook,
   createAsset,
   createUser,
   deleteAssetById,
@@ -15,7 +16,8 @@ import {
   getUserByEmail,
   getUserById,
   initDb,
-  updateAssetById
+  updateAssetById,
+  updateUserPlan
 } from './server/db.js';
 import { assertJwtSecret, generateToken, hashPassword, requireAuth, verifyPassword } from './server/auth.js';
 import { calculateAssetInvested } from './src/utils/assetValuation.js';
@@ -42,15 +44,54 @@ const BCB_BASE_URL = 'https://api.bcb.gov.br/dados/serie/bcdata.sgs';
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 const ALLOWED_SERIES = new Set(['12', '196', '433', '4390', '4392']);
 const MAX_CHUNK_YEARS = 5;
+const QUOTE_CACHE_TTL = 60 * 1000;
 const EVOLUTION_CACHE_TTL = 60 * 60 * 1000;
 const evolutionCache = new Map();
 const historicalQuoteCache = new Map();
+const coinGeckoQuoteCache = new Map();
+const brapiQuoteCache = new Map();
+const exchangeRatesCache = new Map();
+const COINGECKO_COINS = {
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
+  SOL: 'solana',
+  ADA: 'cardano',
+  DOGE: 'dogecoin',
+  XRP: 'ripple',
+  LTC: 'litecoin',
+  USDT: 'tether',
+  BNB: 'binancecoin',
+  DOT: 'polkadot',
+  MATIC: 'polygon-ecosystem-token',
+  AVAX: 'avalanche-2',
+  LINK: 'chainlink',
+  UNI: 'uniswap',
+  ATOM: 'cosmos',
+  XLM: 'stellar',
+  ALGO: 'algorand',
+  VET: 'vechain'
+};
+const COINGECKO_SYMBOLS = Object.fromEntries(
+  Object.entries(COINGECKO_COINS).map(([symbol, coinId]) => [coinId, symbol])
+);
 const sendJson = (response, status, payload) => {
   response.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store'
   });
   response.end(JSON.stringify(payload));
+};
+const readCachedValue = (cache, key) => {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.value;
+};
+const writeCachedValue = (cache, key, value) => {
+  cache.set(key, { expiresAt: Date.now() + QUOTE_CACHE_TTL, value });
 };
 
 const serveProductionFile = async (request, response) => {
@@ -228,6 +269,197 @@ const handlePlanStatus = async (request, response) => {
 
 const handleAuthLogout = (_request, response) => {
   sendJson(response, 200, { success: true });
+};
+
+const verifyMercadoPagoWebhookSignature = (request, requestUrl) => {
+  const signatureHeader = request.headers['x-signature'];
+  if (typeof signatureHeader !== 'string') return false;
+
+  const signatureParts = Object.fromEntries(
+    signatureHeader.split(',').map((part) => {
+      const separator = part.indexOf('=');
+      return separator < 0
+        ? ['', '']
+        : [part.slice(0, separator).trim(), part.slice(separator + 1).trim()];
+    })
+  );
+  const timestamp = signatureParts.ts;
+  const suppliedHash = signatureParts.v1;
+  if (!/^\d+$/.test(timestamp || '') || !/^[a-f\d]{64}$/i.test(suppliedHash || '')) return false;
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 600) return false;
+
+  const manifestParts = [];
+  const dataId = requestUrl.searchParams.get('data.id');
+  const requestId = request.headers['x-request-id'];
+  if (dataId) manifestParts.push(`id:${dataId}`);
+  if (typeof requestId === 'string' && requestId.trim()) {
+    manifestParts.push(`request-id:${requestId.trim()}`);
+  }
+  manifestParts.push(`ts:${timestamp}`);
+
+  const manifest = `${manifestParts.join(';')};`;
+  const expectedHash = createHmac('sha256', process.env.MP_WEBHOOK_SECRET)
+    .update(manifest)
+    .digest();
+  const receivedHash = Buffer.from(suppliedHash, 'hex');
+  return expectedHash.length === receivedHash.length
+    && timingSafeEqual(expectedHash, receivedHash);
+};
+
+const fetchMercadoPagoResource = async (resourcePath, resourceId) => {
+  const upstream = await fetch(
+    `https://api.mercadopago.com/${resourcePath}/${encodeURIComponent(resourceId)}`,
+    {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
+      }
+    }
+  );
+  if (!upstream.ok) throw new Error(`Mercado Pago respondeu HTTP ${upstream.status}.`);
+  return upstream.json();
+};
+
+const getPlanDurationDays = (resource) => {
+  const selectedPlan = String(resource?.metadata?.plan || '').toLowerCase();
+  if (['annual', 'yearly', 'anual'].includes(selectedPlan)) return 365;
+  if (['monthly', 'mensal'].includes(selectedPlan)) return 30;
+
+  const recurring = resource?.auto_recurring;
+  if (recurring) {
+    const frequency = Number(recurring.frequency);
+    const unit = String(recurring.frequency_type || '').toLowerCase();
+    if (unit === 'years' || (unit === 'months' && frequency >= 12) || (unit === 'days' && frequency >= 365)) return 365;
+    if (unit === 'months' || unit === 'days') return 30;
+  }
+
+  const amount = Number(resource?.transaction_amount ?? resource?.auto_recurring?.transaction_amount);
+  if (Math.abs(amount - 191.88) < 0.01) return 365;
+  if (Math.abs(amount - 19.99) < 0.01) return 30;
+  return null;
+};
+
+const handleMercadoPagoWebhook = async (request, response) => {
+  if (!process.env.MP_ACCESS_TOKEN || !process.env.MP_WEBHOOK_SECRET) {
+    sendJson(response, 503, { error: 'Credenciais do Mercado Pago não configuradas.' });
+    return;
+  }
+
+  let notification;
+  try {
+    notification = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const requestUrl = new URL(request.url, `http://${request.headers.host}`);
+  if (!verifyMercadoPagoWebhookSignature(request, requestUrl)) {
+    sendJson(response, 401, { error: 'Assinatura do webhook inválida.' });
+    return;
+  }
+
+  const eventType = String(
+    notification?.type
+      || requestUrl.searchParams.get('type')
+      || requestUrl.searchParams.get('topic')
+      || ''
+  ).toLowerCase();
+  const resourceId = requestUrl.searchParams.get('data.id') || String(notification?.data?.id || '');
+  if (!eventType || !resourceId) {
+    sendJson(response, 200, { received: true, processed: false });
+    return;
+  }
+
+  try {
+    let userReference;
+    let planResource;
+    let isApproved = false;
+
+    if (eventType === 'payment') {
+      const payment = await fetchMercadoPagoResource('v1/payments', resourceId);
+      isApproved = payment.status === 'approved';
+      userReference = payment.external_reference;
+      planResource = payment;
+    } else if (['subscription', 'preapproval', 'subscription_preapproval'].includes(eventType)) {
+      const subscription = await fetchMercadoPagoResource('preapproval', resourceId);
+      isApproved = subscription.status === 'authorized';
+      userReference = subscription.external_reference;
+      planResource = subscription;
+    } else if (eventType === 'subscription_authorized_payment') {
+      const authorizedPayment = await fetchMercadoPagoResource('authorized_payments', resourceId);
+      isApproved = ['processed', 'approved'].includes(authorizedPayment.status);
+      if (isApproved && authorizedPayment.preapproval_id) {
+        const subscription = await fetchMercadoPagoResource('preapproval', authorizedPayment.preapproval_id);
+        userReference = subscription.external_reference;
+        planResource = subscription;
+      }
+    } else {
+      sendJson(response, 200, { received: true, processed: false });
+      return;
+    }
+
+    if (!isApproved) {
+      sendJson(response, 200, { received: true, processed: false });
+      return;
+    }
+
+    const userId = Number(userReference);
+    const durationDays = getPlanDurationDays(planResource);
+    if (!Number.isSafeInteger(userId) || userId <= 0 || !durationDays) {
+      console.warn('Mercado Pago approval missing a valid user reference or plan period.');
+      sendJson(response, 200, { received: true, processed: false });
+      return;
+    }
+
+    const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+    const eventId = `${eventType}:${resourceId}`;
+    const result = await activateUserPlanFromWebhook(eventId, userId, expiresAt);
+    sendJson(response, 200, { received: true, processed: result.updated || result.duplicate });
+  } catch (error) {
+    console.error('Mercado Pago webhook error:', error);
+    sendJson(response, 500, { error: 'Não foi possível processar a notificação do Mercado Pago.' });
+  }
+};
+
+const handleActivatePro = async (request, response) => {
+  if (process.env.NODE_ENV === 'production') {
+    sendJson(response, 404, { error: 'Rota não encontrada.' });
+    return;
+  }
+
+  const userId = requireAuth(request);
+  if (!userId) {
+    sendJson(response, 401, { error: 'Autenticação necessária.' });
+    return;
+  }
+
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  if (!['monthly', 'yearly'].includes(payload?.plan)) {
+    sendJson(response, 400, { error: 'Plano inválido. Use monthly ou yearly.' });
+    return;
+  }
+
+  const days = payload.plan === 'yearly' ? 365 : 30;
+  const planExpiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const updated = await updateUserPlan(userId, planExpiresAt);
+    if (!updated) {
+      sendJson(response, 404, { error: 'Usuário não encontrado.' });
+      return;
+    }
+    sendJson(response, 200, { success: true, plan: 'pro', plan_expires_at: planExpiresAt });
+  } catch (error) {
+    console.error('Manual PRO activation error:', error);
+    sendJson(response, 500, { error: 'Não foi possível ativar o plano de teste.' });
+  }
 };
 
 const toPublicAsset = (asset) => ({
@@ -790,9 +1022,164 @@ const handleBcbRequest = async (request, response) => {
   }
 };
 
-const server = createServer((request, response) => {
+const handleCoinGeckoRequest = async (request, response) => {
+    const requestUrl = new URL(request.url, `http://${request.headers.host}`);
+    const requestedCoin = String(requestUrl.searchParams.get('coin') || '').trim();
+    const normalizedTicker = requestedCoin
+      .toUpperCase()
+      .replace(/(?:\/BRL|-BRL)$/i, '')
+      .replace(/[/-]/g, '');
+    const coinId = COINGECKO_COINS[normalizedTicker]
+      || COINGECKO_SYMBOLS[requestedCoin.toLowerCase()];
+    const symbol = COINGECKO_SYMBOLS[coinId];
+
+    if (!coinId) {
+      sendJson(response, 400, { error: 'Criptomoeda não suportada.' });
+      return;
+    }
+
+    const cached = readCachedValue(coinGeckoQuoteCache, coinId);
+    if (cached) {
+      sendJson(response, 200, cached);
+      return;
+    }
+
+    try {
+      const headers = { Accept: 'application/json' };
+      const apiKey = request.headers['x-cg-demo-api-key'];
+      if (typeof apiKey === 'string' && apiKey.trim()) {
+        headers['x-cg-demo-api-key'] = apiKey.trim();
+      }
+
+      const upstream = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coinId)}&vs_currencies=brl`,
+        { headers }
+      );
+      if (!upstream.ok) {
+        sendJson(response, upstream.status === 429 ? 429 : 502, {
+          error: `CoinGecko respondeu HTTP ${upstream.status}.`
+        });
+        return;
+      }
+
+      const payload = await upstream.json();
+      const price = Number(payload?.[coinId]?.brl);
+      if (!Number.isFinite(price) || price <= 0) {
+        sendJson(response, 502, { error: 'CoinGecko não retornou uma cotação válida em BRL.' });
+        return;
+      }
+
+      const quote = { symbol, price, currency: 'BRL' };
+      writeCachedValue(coinGeckoQuoteCache, coinId, quote);
+      sendJson(response, 200, quote);
+    } catch (error) {
+      sendJson(response, 502, { error: error.message || 'Falha ao consultar o CoinGecko.' });
+    }
+  };
+
+  const handleBrapiRequest = async (request, response) => {
+    const requestUrl = new URL(request.url, `http://${request.headers.host}`);
+    const symbol = String(requestUrl.searchParams.get('symbol') || '').trim().toUpperCase();
+
+    if (!symbol || symbol.length > 32 || !/^[A-Z0-9.-]+$/.test(symbol)) {
+      sendJson(response, 400, { error: 'Ticker brapi inválido.' });
+      return;
+    }
+
+    const cached = readCachedValue(brapiQuoteCache, symbol);
+    if (cached) {
+      sendJson(response, 200, cached);
+      return;
+    }
+
+    try {
+      const headers = { Accept: 'application/json' };
+      const authorization = request.headers.authorization;
+      if (typeof authorization === 'string' && /^Bearer\s+\S+$/i.test(authorization)) {
+        headers.Authorization = authorization;
+      }
+
+      const upstream = await fetch(
+        `https://brapi.dev/api/quote/${encodeURIComponent(symbol)}`,
+        { headers }
+      );
+      if (!upstream.ok) {
+        sendJson(response, upstream.status === 429 ? 429 : 502, {
+          error: `brapi respondeu HTTP ${upstream.status}.`
+        });
+        return;
+      }
+
+      const payload = await upstream.json();
+      const results = Array.isArray(payload?.results) ? payload.results : [];
+      const quote = results.find((item) => item?.symbol?.toUpperCase() === symbol) || results[0];
+      const price = Number(quote?.regularMarketPrice);
+      if (!quote || !Number.isFinite(price) || price <= 0) {
+        sendJson(response, 502, { error: 'brapi não retornou uma cotação válida.' });
+        return;
+      }
+
+      const result = {
+        ...quote,
+        symbol: quote.symbol || symbol,
+        price,
+        currency: quote.currency || 'BRL'
+      };
+      writeCachedValue(brapiQuoteCache, symbol, result);
+      sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, 502, { error: error.message || 'Falha ao consultar a brapi.' });
+    }
+  };
+
+  const handleExchangeRatesRequest = async (_request, response) => {
+    const cached = readCachedValue(exchangeRatesCache, 'rates');
+    if (cached) {
+      sendJson(response, 200, cached);
+      return;
+    }
+
+    try {
+      const upstream = await fetch(
+        'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,GBP-BRL,CAD-BRL',
+        { headers: { Accept: 'application/json' } }
+      );
+      if (!upstream.ok) {
+        sendJson(response, 502, { error: `AwesomeAPI respondeu HTTP ${upstream.status}.` });
+        return;
+      }
+
+      const rates = await upstream.json();
+      if (!rates?.USDBRL || !rates?.EURBRL) {
+        sendJson(response, 502, { error: 'AwesomeAPI retornou dados de câmbio inválidos.' });
+        return;
+      }
+
+      writeCachedValue(exchangeRatesCache, 'rates', rates);
+      sendJson(response, 200, rates);
+    } catch (error) {
+      sendJson(response, 502, { error: error.message || 'Falha ao consultar a AwesomeAPI.' });
+    }
+  };
+
+  const server = createServer((request, response) => {
   if (isProduction && !request.url?.startsWith('/api')) {
     serveProductionFile(request, response);
+    return;
+  }
+
+  if (request.method === 'GET' && /^\/api\/coingecko(?:\?|$)/.test(request.url || '')) {
+    handleCoinGeckoRequest(request, response);
+    return;
+  }
+
+  if (request.method === 'GET' && /^\/api\/brapi(?:\?|$)/.test(request.url || '')) {
+    handleBrapiRequest(request, response);
+    return;
+  }
+
+  if (request.method === 'GET' && request.url === '/api/exchange-rates') {
+    handleExchangeRatesRequest(request, response);
     return;
   }
 
@@ -803,6 +1190,16 @@ const server = createServer((request, response) => {
 
   if (request.method === 'POST' && request.url === '/api/assets') {
     handleCreateAsset(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && request.url?.split('?')[0] === '/api/webhook/mercadopago') {
+    handleMercadoPagoWebhook(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && request.url === '/api/auth/activate-pro') {
+    handleActivatePro(request, response);
     return;
   }
 

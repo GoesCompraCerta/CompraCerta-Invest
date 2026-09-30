@@ -1,13 +1,26 @@
 import { BRAPI_TYPES } from '../constants/config';
 import { brapiApiKeyStorage } from './storageService';
 
-const buildBrapiUrl = (endpoint, params = {}) => {
-  const query = new URLSearchParams(params);
+const fetchBrapiQuote = async (ticker) => {
+  const symbol = String(ticker || '').trim().toUpperCase();
+  if (!symbol) throw new Error('Ticker brapi inválido.');
+
+  const headers = { Accept: 'application/json' };
   const apiKey = brapiApiKeyStorage.get();
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-  if (apiKey) query.set('token', apiKey);
+  const response = await fetch(`/api/brapi?symbol=${encodeURIComponent(symbol)}`, { headers });
+  if (!response.ok) {
+    let details = null;
+    try {
+      details = await response.json();
+    } catch {
+      // Ignore empty or non-JSON proxy error responses.
+    }
+    throw new Error(details?.error || `brapi HTTP ${response.status}`);
+  }
 
-  return `https://brapi.dev/api/${endpoint}?${query.toString()}`;
+  return response.json();
 };
 
 // ── Fetch quotes from Brapi API ──────────────────────────────────────────────
@@ -17,26 +30,13 @@ export const fetchBrapiQuotes = async (tickers) => {
       throw new Error('No tickers provided');
     }
 
-    const tickerString = tickers.join(',');
-    const res = await fetch(buildBrapiUrl(`quote/${encodeURIComponent(tickerString)}`), {
-      headers: { Accept: 'application/json' }
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    const results = data?.results ?? [];
-
-    if (results.length === 0) {
-      throw new Error('No results from Brapi');
-    }
+    const results = await Promise.all(tickers.map(fetchBrapiQuote));
 
     const priceMap = {};
-    results.forEach((r) => {
-      if (r?.symbol && r?.regularMarketPrice != null) {
-        priceMap[r.symbol.toUpperCase()] = r.regularMarketPrice;
+    results.forEach((result) => {
+      const price = result?.regularMarketPrice ?? result?.price;
+      if (result?.symbol && price != null) {
+        priceMap[result.symbol.toUpperCase()] = price;
       }
     });
 
@@ -53,17 +53,7 @@ export const fetchBrapiFundamentals = async (tickers) => {
       throw new Error('No tickers provided');
     }
 
-    const tickerString = tickers.join(',');
-    const res = await fetch(buildBrapiUrl(`quote/${encodeURIComponent(tickerString)}`), {
-      headers: { Accept: 'application/json' }
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    return data?.results ?? data ?? [];
+    return Promise.all(tickers.map(fetchBrapiQuote));
   } catch (error) {
     console.error('Brapi fundamentals error:', error);
     throw error;

@@ -53,7 +53,7 @@ export const fetchExchangeRates = async () => {
   }
 
   try {
-    const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,GBP-BRL,CAD-BRL');
+    const response = await fetch('/api/exchange-rates');
     if (!response.ok) throw new Error(`AwesomeAPI HTTP ${response.status}`);
 
     const data = await response.json();
@@ -82,50 +82,28 @@ export const fetchCoinGeckoData = async (ticker) => {
       .replace('-', '')
       .trim();
 
-    const mapping = {
-      BTC: 'bitcoin',
-      ETH: 'ethereum',
-      SOL: 'solana',
-      ADA: 'cardano',
-      DOGE: 'dogecoin',
-      XRP: 'ripple',
-      LTC: 'litecoin',
-      USDT: 'tether',
-      BNB: 'binancecoin',
-      DOT: 'polkadot',
-      MATIC: 'polygon-ecosystem-token',
-      AVAX: 'avalanche-2',
-      LINK: 'chainlink',
-      UNI: 'uniswap',
-      ATOM: 'cosmos',
-      XLM: 'stellar',
-      ALGO: 'algorand',
-      VET: 'vechain'
-    };
-
-    const coinId = mapping[cleanTicker];
-    if (!coinId) {
-      throw new Error(`CoinGecko: Sigla ${cleanTicker} não mapeada no sistema.`);
-    }
-
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coinId)}&vs_currencies=brl`;
     const apiKey = getStorageKey('goes_compra_certa_coingecko_api_key');
     const headers = { Accept: 'application/json' };
+    if (apiKey) headers['x-cg-demo-api-key'] = apiKey;
 
-    if (apiKey) {
-      headers['x-cg-demo-api-key'] = apiKey;
+    const response = await fetch(`/api/coingecko?coin=${encodeURIComponent(cleanTicker)}`, { headers });
+    if (!response.ok) {
+      let details = null;
+      try {
+        details = await response.json();
+      } catch {
+        // Ignore empty or non-JSON proxy error responses.
+      }
+      throw new Error(details?.error || `CoinGecko HTTP ${response.status}`);
     }
 
-    const response = await fetch(url, { headers });
-    if (!response.ok) throw new Error(`CoinGecko HTTP ${response.status}`);
-
     const data = await response.json();
-    const price = data[coinId]?.brl;
-    if (price == null) {
+    const price = Number(data?.price);
+    if (!Number.isFinite(price) || price <= 0) {
       throw new Error('CoinGecko: cotação em BRL não encontrada para o ativo');
     }
 
-    return { price: Number(price), ...EMPTY_MARKET_DATA };
+    return { price, ...EMPTY_MARKET_DATA };
   } catch (error) {
     console.error('CoinGecko error:', error);
     throw error;

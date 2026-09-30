@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
-import { Check, Eye, EyeOff, Moon, Sun } from 'lucide-react';
+import { Check, ExternalLink, Eye, EyeOff, Moon, Sun } from 'lucide-react';
+import { activateProForTest } from '../services/authService';
 import { brapiApiKeyStorage, coinGeckoApiKeyStorage } from '../services/storageService';
+
+const PLAN_LINKS = {
+  monthly: 'https://mpago.la/2WfrFAf',
+  annual: 'https://mpago.la/2N8oay5'
+};
 
 export default function UserSettingsPage({
   t,
+  planStatus,
+  setPlanStatus,
   lang,
   setLang,
   isDarkMode,
@@ -14,56 +22,13 @@ export default function UserSettingsPage({
   cardClass
 }) {
   const [activeTab, setActiveTab] = useState('account');
-  const [isEditing, setIsEditing] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [apiKeySaved, setApiKeySaved] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [testActivationMessage, setTestActivationMessage] = useState('');
+  const [isActivatingTestPlan, setIsActivatingTestPlan] = useState(false);
   const [showBrapiApiKey, setShowBrapiApiKey] = useState(false);
   const [showCoinGeckoApiKey, setShowCoinGeckoApiKey] = useState(false);
   const [brapiApiKey, setBrapiApiKey] = useState(() => brapiApiKeyStorage.get());
   const [coinGeckoApiKey, setCoinGeckoApiKey] = useState(() => coinGeckoApiKeyStorage.get());
-  const [userData, setUserData] = useState({
-    nomeCompleto: '',
-    email: '',
-    cpf: '',
-    dataNascimento: '',
-    telefone: '',
-    senha: '',
-    statusPlano: 'free'
-  });
-
-  const formatDate = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 8);
-    let formatted = digits;
-
-    if (digits.length > 2) {
-      formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    }
-    if (digits.length > 4) {
-      formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-    }
-
-    return formatted;
-  };
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-
-    if (name === 'dataNascimento') {
-      setUserData((current) => ({ ...current, [name]: formatDate(value) }));
-      setSaved(false);
-      return;
-    }
-
-    setUserData((current) => ({ ...current, [name]: value }));
-    setSaved(false);
-  };
-
-  const handleSave = (event) => {
-    event.preventDefault();
-    setIsEditing(false);
-    setSaved(true);
-  };
 
   const handleSaveApiKey = (event) => {
     event.preventDefault();
@@ -72,6 +37,20 @@ export default function UserSettingsPage({
     setBrapiApiKey(brapiApiKeyStorage.get());
     setCoinGeckoApiKey(coinGeckoApiKeyStorage.get());
     setApiKeySaved(true);
+  };
+
+  const handleActivateProTest = async () => {
+    setIsActivatingTestPlan(true);
+    setTestActivationMessage('');
+    try {
+      const result = await activateProForTest('monthly');
+      setPlanStatus({ plan: result.plan, planExpiresAt: result.plan_expires_at, daysRemaining: null });
+      setTestActivationMessage(t.testProActivated);
+    } catch {
+      setTestActivationMessage(t.testProActivationFailed);
+    } finally {
+      setIsActivatingTestPlan(false);
+    }
   };
 
   const inputClass = `w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -115,92 +94,62 @@ export default function UserSettingsPage({
             <div>
               <p className={`text-xs font-bold ${mutedClass}`}>{t.planLabel}</p>
               <p className={`mt-1 text-lg font-black ${themeStyle.text}`}>
-                {userData.statusPlano === 'free' ? t.freePlan : t.proPlan}
+                {planStatus?.plan === 'pro'
+                  ? t.proUnlimited
+                  : planStatus?.plan === 'trial'
+                    ? t.trialDaysRemaining.replace('{days}', String(Math.max(0, planStatus.daysRemaining || 0)))
+                    : t.planUnavailable}
               </p>
             </div>
-            {userData.statusPlano === 'free' && (
-              <button
-                type="button"
-                onClick={() => setUserData((current) => ({ ...current, statusPlano: 'pro' }))}
-                className={`rounded-xl px-4 py-2 text-sm font-bold text-white transition ${themeStyle.btn}`}
-              >
-                {t.upgradeBtn}
-              </button>
-            )}
           </div>
 
-          <form onSubmit={handleSave}>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {[
-                ['nomeCompleto', t.name, 'text'],
-                ['email', t.email, 'email'],
-                ['cpf', t.cpf, 'text'],
-                ['telefone', t.phone, 'tel']
-              ].map(([name, label, type]) => (
-                <label key={name} className={name === 'nomeCompleto' ? 'md:col-span-2' : ''}>
-                  <span className="mb-1.5 block text-xs font-bold">{label}</span>
-                  <input
-                    type={type}
-                    name={name}
-                    value={userData[name]}
-                    onChange={handleChange}
-                    disabled={!isEditing}
-                    className={inputClass}
-                  />
-                </label>
-              ))}
-
-              <label>
-                <span className="mb-1.5 block text-xs font-bold">{t.birthdate}</span>
-                <input
-                  type="text"
-                  name="dataNascimento"
-                  value={userData.dataNascimento}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  className={inputClass}
-                  placeholder=" "
-                  aria-label={t.birthdate}
-                  inputMode="numeric"
-                  maxLength={10}
-                />
-              </label>
-
-              <label className="md:col-span-2">
-                <span className="mb-1.5 block text-xs font-bold">{t.password}</span>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="senha"
-                    value={userData.senha}
-                    onChange={handleChange}
-                    disabled={!isEditing}
-                    className={`${inputClass} pr-10`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((current) => !current)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-white"
-                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </label>
+          {planStatus?.plan !== 'pro' && (
+            <div className={`rounded-xl border p-4 ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
+              <p className="font-bold">{t.paymentTitle}</p>
+              <p className={`mt-1 text-sm ${mutedClass}`}>{t.paymentCheckoutNote}</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <a
+                  href={PLAN_LINKS.monthly}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-white transition ${themeStyle.btn}`}
+                >
+                  {t.trialExpiredMonthly}
+                  <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                </a>
+                <a
+                  href={PLAN_LINKS.annual}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-bold transition ${
+                    isDarkMode ? 'border-slate-700 text-slate-100 hover:bg-slate-800' : 'border-slate-300 text-slate-800 hover:bg-slate-100'
+                  }`}
+                >
+                  {t.trialExpiredAnnual}
+                  <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                </a>
+              </div>
             </div>
+          )}
 
-            <div className="mt-6 flex flex-wrap justify-end gap-3">
-              {saved && <span className={`mr-auto flex items-center gap-1.5 text-sm font-bold ${themeStyle.text}`}><Check className="h-4 w-4" />{t.successMsg}</span>}
-              {isEditing ? (
-                <>
-                  <button type="button" onClick={() => setIsEditing(false)} className="rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-600">{t.cancelBtn}</button>
-                  <button type="submit" className={`rounded-xl px-4 py-2 text-sm ${themeStyle.btn}`}>{t.saveBtn}</button>
-                </>
-              ) : (
-                <button type="button" onClick={() => { setIsEditing(true); setSaved(false); }} className="rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-600">{t.editBtn}</button>
+          {import.meta.env.DEV && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {/* TODO: remover quando webhook estiver funcionando */}
+              <button
+                type="button"
+                disabled={isActivatingTestPlan}
+                onClick={handleActivateProTest}
+                className={`rounded-lg px-4 py-2.5 text-sm font-bold text-white transition disabled:cursor-wait disabled:opacity-60 ${themeStyle.btn}`}
+              >
+                {isActivatingTestPlan ? t.testProActivating : t.activateProTest}
+              </button>
+              {testActivationMessage && (
+                <span className={`text-sm font-semibold ${testActivationMessage === t.testProActivated ? themeStyle.text : 'text-rose-500'}`} role="status">
+                  {testActivationMessage}
+                </span>
               )}
             </div>
-          </form>
+          )}
         </div>
       )}
 

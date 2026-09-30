@@ -20,5 +20,9 @@ services:
         sync: false
       - key: DB_PASSWORD
         sync: false
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: MP_WEBHOOK_SECRET
+        sync: false
       - key: VITE_BRAPI_API_KEY
         sync: false
