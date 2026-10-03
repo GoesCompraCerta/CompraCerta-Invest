@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
@@ -9,17 +9,21 @@ import YahooFinance from 'yahoo-finance2';
 import {
   activateUserPlanFromWebhook,
   createAsset,
+  createPasswordReset,
   createUser,
   deleteAssetById,
+  deleteUserAndAssets,
   getAssetById,
   getAssetsByUserId,
   getUserByEmail,
   getUserById,
   initDb,
+  resetPasswordWithToken,
   updateAssetById,
   updateUserPlan
 } from './server/db.js';
 import { assertJwtSecret, generateToken, hashPassword, requireAuth, verifyPassword } from './server/auth.js';
+import { sendPasswordResetEmail } from './server/emailService.js';
 import { calculateAssetInvested } from './src/utils/assetValuation.js';
 
 try {
@@ -228,6 +232,70 @@ const handleAuthLogin = async (request, response) => {
   sendJson(response, 200, { token: generateToken(user.id), user: toPublicUser(user) });
 };
 
+const handleAuthForgotPassword = async (request, response) => {
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const email = typeof payload?.email === 'string' ? payload.email.trim().toLowerCase() : '';
+  const genericResponse = {
+    success: true,
+    message: 'Se o e-mail existir, você receberá um link.'
+  };
+  const user = email ? await getUserByEmail(email) : null;
+
+  if (user) {
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    try {
+      await createPasswordReset(user.id, tokenHash, expiresAt);
+      await sendPasswordResetEmail(user.email, token);
+    } catch (error) {
+      console.error('Password reset request could not be completed:', error.message);
+    }
+  }
+
+  sendJson(response, 200, genericResponse);
+};
+
+const handleAuthResetPassword = async (request, response) => {
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const token = typeof payload?.token === 'string' ? payload.token : '';
+  const newPassword = typeof payload?.newPassword === 'string' ? payload.newPassword : '';
+  if (newPassword.length < 8) {
+    sendJson(response, 400, { error: 'A senha deve ter no mínimo 8 caracteres' });
+    return;
+  }
+
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  try {
+    const passwordHash = await hashPassword(newPassword);
+    const wasReset = await resetPasswordWithToken(tokenHash, passwordHash);
+    if (!wasReset) {
+      sendJson(response, 400, { error: 'Token inválido ou expirado' });
+      return;
+    }
+
+    sendJson(response, 200, { success: true, message: 'Senha redefinida com sucesso' });
+  } catch (error) {
+    console.error('Password reset could not be completed:', error.message);
+    sendJson(response, 500, { error: 'Não foi possível redefinir a senha.' });
+  }
+};
+
 const handleAuthMe = async (request, response) => {
   const userId = requireAuth(request);
   if (!userId) {
@@ -241,6 +309,65 @@ const handleAuthMe = async (request, response) => {
     return;
   }
   sendJson(response, 200, { user: toPublicUser(user) });
+};
+
+const handleAuthExportData = async (request, response) => {
+  const userId = requireAuth(request);
+  if (!userId) {
+    sendJson(response, 401, { error: 'Autenticação necessária.' });
+    return;
+  }
+
+  const user = await getUserById(userId);
+  if (!user) {
+    sendJson(response, 401, { error: 'Usuário não encontrado.' });
+    return;
+  }
+
+  const assets = await getAssetsByUserId(userId);
+  sendJson(response, 200, {
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      created_at: user.created_at,
+      plan: user.plan,
+      plan_expires_at: user.plan_expires_at
+    },
+    assets,
+    exportedAt: new Date().toISOString()
+  });
+};
+
+const handleAuthDeleteAccount = async (request, response) => {
+  const userId = requireAuth(request);
+  if (!userId) {
+    sendJson(response, 401, { error: 'Autenticação necessária.' });
+    return;
+  }
+
+  const user = await getUserById(userId);
+  if (!user) {
+    sendJson(response, 404, { error: 'Usuário não encontrado' });
+    return;
+  }
+
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const password = typeof payload?.password === 'string' ? payload.password : '';
+  if (!await verifyPassword(password, user.password_hash)) {
+    sendJson(response, 401, { error: 'Senha incorreta' });
+    return;
+  }
+
+  await deleteUserAndAssets(userId);
+  sendJson(response, 200, { success: true });
 };
 
 const handlePlanStatus = async (request, response) => {
@@ -1224,6 +1351,16 @@ const handleCoinGeckoRequest = async (request, response) => {
     return;
   }
 
+  if (request.method === 'POST' && request.url === '/api/auth/forgot-password') {
+    handleAuthForgotPassword(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && request.url === '/api/auth/reset-password') {
+    handleAuthResetPassword(request, response);
+    return;
+  }
+
   if (request.method === 'GET' && request.url === '/api/auth/plan-status') {
     handlePlanStatus(request, response);
     return;
@@ -1231,6 +1368,16 @@ const handleCoinGeckoRequest = async (request, response) => {
 
   if (request.method === 'GET' && request.url === '/api/auth/me') {
     handleAuthMe(request, response);
+    return;
+  }
+
+  if (request.method === 'GET' && request.url === '/api/auth/export-data') {
+    handleAuthExportData(request, response);
+    return;
+  }
+
+  if (request.method === 'DELETE' && request.url === '/api/auth/delete-account') {
+    handleAuthDeleteAccount(request, response);
     return;
   }
 

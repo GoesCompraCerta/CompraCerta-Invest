@@ -132,6 +132,17 @@ export const initDb = async () => {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id INT UNSIGNED NOT NULL,
+      token CHAR(64) NOT NULL UNIQUE,
+      expires_at DATETIME NOT NULL,
+      used TINYINT(1) NOT NULL DEFAULT 0,
+      CONSTRAINT fk_password_resets_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       name VARCHAR(100) NOT NULL PRIMARY KEY,
       applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -169,6 +180,58 @@ export const createUser = async ({ name, email, passwordHash, trialStartedAt, pl
 export const getUserById = async (id) => {
   const [rows] = await db.execute('SELECT * FROM users WHERE id = ?', [id]);
   return rows[0];
+};
+
+export const createPasswordReset = async (userId, tokenHash, expiresAt) => {
+  await db.execute(
+    'INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)',
+    [userId, tokenHash, expiresAt]
+  );
+};
+
+export const resetPasswordWithToken = async (tokenHash, passwordHash) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [resetRows] = await connection.execute(`
+      SELECT id, user_id
+      FROM password_resets
+      WHERE token = ? AND used = 0 AND expires_at > ?
+      LIMIT 1
+      FOR UPDATE
+    `, [tokenHash, new Date()]);
+    const reset = resetRows[0];
+    if (!reset) {
+      await connection.rollback();
+      return false;
+    }
+
+    const [userResult] = await connection.execute(
+      'UPDATE users SET password_hash = ? WHERE id = ?',
+      [passwordHash, reset.user_id]
+    );
+    if (userResult.affectedRows === 0) {
+      await connection.rollback();
+      return false;
+    }
+
+    const [resetResult] = await connection.execute(
+      'UPDATE password_resets SET used = 1 WHERE id = ? AND used = 0',
+      [reset.id]
+    );
+    if (resetResult.affectedRows === 0) {
+      await connection.rollback();
+      return false;
+    }
+
+    await connection.commit();
+    return true;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 };
 
 export const updateUserPlan = async (userId, planExpiresAt) => {
@@ -250,4 +313,20 @@ export const updateAssetById = async (assetId, { ticker, type, qty, buyPrice, bu
 export const deleteAssetById = async (assetId) => {
   const [result] = await db.execute('DELETE FROM assets WHERE id = ?', [assetId]);
   return result;
+};
+
+export const deleteUserAndAssets = async (userId) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute('DELETE FROM assets WHERE user_id = ?', [userId]);
+    const [userResult] = await connection.execute('DELETE FROM users WHERE id = ?', [userId]);
+    await connection.commit();
+    return userResult.affectedRows > 0;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 };

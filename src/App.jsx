@@ -25,6 +25,10 @@ import UserSettingsPage from './pages/UserSettingsPage';
 import TrialExpiredPage from './pages/TrialExpiredPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfUsePage from './pages/TermsOfUsePage';
 import ProtectedRoute from './components/Common/ProtectedRoute';
 
 // Hooks
@@ -51,6 +55,8 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(() => authService.isAuthenticated());
   const [planStatus, setPlanStatus] = useState(null);
   const [isTrialExpired, setIsTrialExpired] = useState(false);
+  const isLegalPage = pathname === '/privacy' || pathname === '/terms';
+  const isPasswordRecoveryPage = pathname === '/forgot-password' || pathname === '/reset-password';
 
   const navigateTo = useCallback((path) => {
     if (window.location.pathname !== path) window.history.pushState({}, '', path);
@@ -65,6 +71,10 @@ export default function App() {
 
   useEffect(() => {
     let isMounted = true;
+    if (isLegalPage || isPasswordRecoveryPage) {
+      setIsAuthChecking(false);
+      return () => { isMounted = false; };
+    }
     if (!authService.isAuthenticated()) {
       setIsAuthenticated(false);
       setPlanStatus(null);
@@ -99,7 +109,7 @@ export default function App() {
       .finally(() => { if (isMounted) setIsAuthChecking(false); });
 
     return () => { isMounted = false; };
-  }, [navigateTo, pathname]);
+  }, [isPasswordRecoveryPage, isLegalPage, navigateTo, pathname]);
 
   // ── State management with hooks ──
   const {
@@ -203,11 +213,38 @@ export default function App() {
     { id: 'tresMosqueteirosFiis', label: t.tresMosqueteirosFiis, icon: Building2 }
   ];
 
+  if (pathname === '/privacy' || pathname === '/terms') {
+    const LegalPage = pathname === '/privacy' ? PrivacyPolicyPage : TermsOfUsePage;
+    return (
+      <LegalPage
+        lang={lang}
+        setLang={setLang}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+        backHref={isAuthenticated ? '/' : '/login'}
+      />
+    );
+  }
+
   if (isAuthChecking) {
     return (
       <div className={`flex min-h-screen items-center justify-center text-sm ${isDarkMode ? 'bg-[#0b0f17] text-slate-300' : 'bg-[#f4f7f5] text-slate-600'}`}>
         {t.authLoadingSession}
       </div>
+    );
+  }
+
+  if (isPasswordRecoveryPage) {
+    const RecoveryPage = pathname === '/forgot-password' ? ForgotPasswordPage : ResetPasswordPage;
+    return (
+      <RecoveryPage
+        t={t}
+        lang={lang}
+        setLang={setLang}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+        navigate={navigateTo}
+      />
     );
   }
 
@@ -409,6 +446,7 @@ export default function App() {
             setPrivacyMode={setPrivacyMode}
             themeStyle={themeStyle}
             cardClass={cardClass}
+            onAccountDeleted={handleLogout}
           />
         )}
 

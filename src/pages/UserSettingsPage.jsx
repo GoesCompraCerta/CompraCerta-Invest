@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Check, ExternalLink, Eye, EyeOff, Moon, Sun } from 'lucide-react';
+import { Check, Download, ExternalLink, Eye, EyeOff, Moon, Sun, Trash2 } from 'lucide-react';
 import { activateProForTest } from '../services/authService';
+import { deleteAccount, exportData } from '../services/lgpdService';
 import { brapiApiKeyStorage, coinGeckoApiKeyStorage } from '../services/storageService';
+import DeleteAccountModal from '../components/Common/DeleteAccountModal';
 
 const PLAN_LINKS = {
   monthly: 'https://mpago.la/2WfrFAf',
@@ -19,7 +21,8 @@ export default function UserSettingsPage({
   privacyMode,
   setPrivacyMode,
   themeStyle,
-  cardClass
+  cardClass,
+  onAccountDeleted
 }) {
   const [activeTab, setActiveTab] = useState('account');
   const [apiKeySaved, setApiKeySaved] = useState(false);
@@ -27,6 +30,11 @@ export default function UserSettingsPage({
   const [isActivatingTestPlan, setIsActivatingTestPlan] = useState(false);
   const [showBrapiApiKey, setShowBrapiApiKey] = useState(false);
   const [showCoinGeckoApiKey, setShowCoinGeckoApiKey] = useState(false);
+  const [isDownloadingData, setIsDownloadingData] = useState(false);
+  const [dataExportError, setDataExportError] = useState('');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState('');
   const [brapiApiKey, setBrapiApiKey] = useState(() => brapiApiKeyStorage.get());
   const [coinGeckoApiKey, setCoinGeckoApiKey] = useState(() => coinGeckoApiKeyStorage.get());
 
@@ -51,6 +59,45 @@ export default function UserSettingsPage({
     } finally {
       setIsActivatingTestPlan(false);
     }
+  };
+
+  const handleExportData = async () => {
+    setIsDownloadingData(true);
+    setDataExportError('');
+    try {
+      const payload = await exportData();
+      const file = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const downloadUrl = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `meus-dados-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch {
+      setDataExportError(t.dataDownloadError);
+    } finally {
+      setIsDownloadingData(false);
+    }
+  };
+
+  const handleDeleteAccount = async (password) => {
+    setIsDeletingAccount(true);
+    setDeleteAccountError('');
+    try {
+      await deleteAccount(password);
+      await onAccountDeleted();
+    } catch (error) {
+      setDeleteAccountError(error.status === 401 ? error.message : t.deleteAccountError);
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
+  const openDeleteAccountModal = () => {
+    setDeleteAccountError('');
+    setIsDeleteModalOpen(true);
   };
 
   const inputClass = `w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -150,6 +197,38 @@ export default function UserSettingsPage({
               )}
             </div>
           )}
+
+          <div className={`mt-4 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
+            <div>
+              <p className="font-bold">{t.myDataTitle}</p>
+              <p className={`mt-1 text-sm ${mutedClass}`}>{t.myDataSubtitle}</p>
+              {dataExportError && <p className="mt-2 text-sm text-rose-500" role="alert">{dataExportError}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={handleExportData}
+              disabled={isDownloadingData}
+              className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 ${themeStyle.btn}`}
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              {isDownloadingData ? t.dataDownloading : t.downloadMyData}
+            </button>
+          </div>
+
+          <div className={`mt-4 flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-rose-900/60 bg-rose-950/20' : 'border-rose-200 bg-rose-50'}`}>
+            <div>
+              <p className="font-bold text-rose-500">{t.deleteAccountSectionTitle}</p>
+              <p className={`mt-1 text-sm ${mutedClass}`}>{t.deleteAccountWarning}</p>
+            </div>
+            <button
+              type="button"
+              onClick={openDeleteAccountModal}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-700"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              {t.deleteAccountButton}
+            </button>
+          </div>
         </div>
       )}
 
@@ -217,6 +296,16 @@ export default function UserSettingsPage({
           </div>
         </div>
       )}
+
+      <DeleteAccountModal
+        isOpen={isDeleteModalOpen}
+        isDarkMode={isDarkMode}
+        t={t}
+        isLoading={isDeletingAccount}
+        error={deleteAccountError}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteAccount}
+      />
     </section>
   );
 }

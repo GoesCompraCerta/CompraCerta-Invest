@@ -129,3 +129,13 @@ export const activateProForTest = async (plan) => {
     body: JSON.stringify({ plan })
   });
 };
+
+export const requestPasswordReset = (email) => request('/api/auth/forgot-password', {
+  method: 'POST',
+  body: JSON.stringify({ email })
+});
+
+export const resetPassword = (token, newPassword) => request('/api/auth/reset-password', {
+  method: 'POST',
+  body: JSON.stringify({ token, newPassword })
+});

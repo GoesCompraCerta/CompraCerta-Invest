@@ -68,6 +68,9 @@ export default function LoginPage({ t, lang, setLang, isDarkMode, setIsDarkMode,
               <input className={`${fieldClass} pr-11`} type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required />
               <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-500 hover:text-emerald-500" aria-label={showPassword ? t.authHidePassword : t.authShowPassword}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
             </span>
+            <span className="mt-2 flex justify-end">
+              <button type="button" onClick={() => navigate('/forgot-password')} className="text-xs font-semibold text-emerald-500 hover:text-emerald-400">{t.forgotPasswordLink}</button>
+            </span>
           </label>
           {error && <p role="alert" className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-500">{error}</p>}
           <button type="submit" disabled={isLoading} className="w-full rounded-lg bg-emerald-500 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60">{isLoading ? t.authSigningIn : t.authSignIn}</button>

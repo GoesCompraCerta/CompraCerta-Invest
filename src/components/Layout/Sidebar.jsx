@@ -4,7 +4,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
-  LogOut
+  LogOut,
+  ShieldCheck,
+  FileText
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -137,6 +139,26 @@ export default function Sidebar({
             <LogOut className="w-4 h-4 shrink-0" />
             {showSidebarLabels && <span>{t.authLogout}</span>}
           </button>
+          <div className={`mt-3 space-y-1 border-t pt-3 ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+            <a
+              href="/privacy"
+              title={!isExpanded ? (lang === 'pt' ? 'Política de Privacidade' : 'Privacy Policy') : undefined}
+              aria-label={lang === 'pt' ? 'Política de Privacidade' : 'Privacy Policy'}
+              className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-[11px] font-semibold ${isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {showSidebarLabels && <span>{lang === 'pt' ? 'Política de Privacidade' : 'Privacy Policy'}</span>}
+            </a>
+            <a
+              href="/terms"
+              title={!isExpanded ? (lang === 'pt' ? 'Termos de Uso' : 'Terms of Use') : undefined}
+              aria-label={lang === 'pt' ? 'Termos de Uso' : 'Terms of Use'}
+              className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-[11px] font-semibold ${isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {showSidebarLabels && <span>{lang === 'pt' ? 'Termos de Uso' : 'Terms of Use'}</span>}
+            </a>
+          </div>
         </div>
       </div>
     </aside>
