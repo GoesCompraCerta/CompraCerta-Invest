@@ -90,6 +90,9 @@ export default function TermsOfUsePage({
               <li>Dados incorretos fornecidos por APIs externas</li>
             </ul>
             <p>O uso do sistema é por sua conta e risco.</p>
+            <p><strong>8.1.</strong> O CompraCerta-Invest NÃO é uma consultoria de investimentos, NÃO faz recomendação de compra ou venda de ativos e NÃO é registrado na CVM (Comissão de Valores Mobiliários).</p>
+            <p><strong>8.2.</strong> Os dados apresentados são de caráter EDUCACIONAL e INFORMATIVO. Investimentos envolvem RISCO, incluindo a possibilidade de perda total do capital.</p>
+            <p><strong>8.3.</strong> A decisão final de investir é SEMPRE SUA. Consulte um profissional habilitado antes de tomar decisões financeiras.</p>
           </section>
           <section className={sectionClass}>
             <h2 className={headingClass}>9. Propriedade intelectual</h2>
@@ -171,6 +174,9 @@ export default function TermsOfUsePage({
               <li>Incorrect data provided by external APIs</li>
             </ul>
             <p>Use of the system is at your own risk.</p>
+            <p><strong>8.1.</strong> CompraCerta-Invest is NOT an investment advisory service, does NOT recommend buying or selling assets, and is NOT registered with the CVM (Brazilian Securities and Exchange Commission).</p>
+            <p><strong>8.2.</strong> The information presented is for EDUCATIONAL and INFORMATIONAL purposes. Investments involve RISK, including the possibility of losing all invested capital.</p>
+            <p><strong>8.3.</strong> The final decision to invest is ALWAYS YOURS. Consult a qualified professional before making financial decisions.</p>
           </section>
           <section className={sectionClass}>
             <h2 className={headingClass}>9. Intellectual property</h2>
