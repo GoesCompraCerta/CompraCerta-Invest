@@ -367,6 +367,10 @@ export default function CompoundInterestPage({
           </table>
         </div>
       </div>
+      <div className="p-2.5 mt-3 mb-6 text-[10.5px] leading-snug rounded-md border border-gray-700/60 bg-gray-100/80 text-gray-800 flex items-start gap-2 dark:border-gray-800 dark:bg-gray-900/40 dark:text-gray-200">
+        <span className="text-yellow-500 font-bold shrink-0">⚠️</span>
+        <p>{t.investmentAnalysisDisclaimer}</p>
+      </div>
     </div>
   );
 }

@@ -25,6 +25,7 @@ import UserSettingsPage from './pages/UserSettingsPage';
 import TrialExpiredPage from './pages/TrialExpiredPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import LandingPage from './pages/LandingPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -231,6 +232,17 @@ export default function App() {
       <div className={`flex min-h-screen items-center justify-center text-sm ${isDarkMode ? 'bg-[#0b0f17] text-slate-300' : 'bg-[#f4f7f5] text-slate-600'}`}>
         {t.authLoadingSession}
       </div>
+    );
+  }
+
+  if (!isAuthenticated && pathname === '/') {
+    return (
+      <LandingPage
+        lang={lang}
+        setLang={setLang}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+      />
     );
   }
 
