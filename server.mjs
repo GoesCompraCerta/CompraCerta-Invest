@@ -1062,7 +1062,7 @@ const handlePortfolioEvolution = async (request, response) => {
 
   const fetchMacro = async (series, label) => {
     try {
-      return await fetchBcbSeries(series, start, end);
+      return await fetchBcbSeries(series, start, now);
     } catch {
       return null;
     }
