@@ -50,7 +50,9 @@ const ALLOWED_SERIES = new Set(['12', '196', '433', '4390', '4392']);
 const MAX_CHUNK_YEARS = 5;
 const QUOTE_CACHE_TTL = 60 * 1000;
 const EVOLUTION_CACHE_TTL = 60 * 60 * 1000;
+const BCB_CACHE_TTL = 24 * 60 * 60 * 1000;
 const evolutionCache = new Map();
+const bcbSeriesCache = new Map();
 const historicalQuoteCache = new Map();
 const coinGeckoQuoteCache = new Map();
 const brapiQuoteCache = new Map();
@@ -752,38 +754,78 @@ const fetchBcbChunk = async (series, start, end) => {
   targetUrl.searchParams.set('dataInicial', start);
   targetUrl.searchParams.set('dataFinal', end);
 
-  const upstream = await fetch(targetUrl, {
-    headers: { Accept: 'application/json' }
-  });
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const upstream = await fetch(targetUrl, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(10_000)
+      });
 
-  if (!upstream.ok) {
-    throw new Error(`Banco Central respondeu HTTP ${upstream.status}`);
+      if (!upstream.ok) {
+        throw new Error(`Banco Central respondeu HTTP ${upstream.status}`);
+      }
+
+      const payload = await upstream.json();
+      if (!Array.isArray(payload)) {
+        throw new Error('Banco Central retornou JSON inválido');
+      }
+
+      return payload;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
   }
 
-  const payload = await upstream.json();
-  if (!Array.isArray(payload)) {
-    throw new Error('Banco Central retornou JSON inválido');
-  }
-
-  return payload;
+  throw lastError || new Error('Não foi possível consultar o Banco Central.');
 };
 
 const fetchBcbSeries = async (series, startDate, endDate) => {
-  const chunks = splitDateRange(startDate, endDate);
-  const responses = await Promise.all(
-    chunks.map(({ start, end }) => fetchBcbChunk(series, start, end))
-  );
-  const unique = new Map();
+  const cacheKey = String(series);
+  const cached = bcbSeriesCache.get(cacheKey);
+  const requestedStart = startDate.toISOString().slice(0, 10);
+  const requestedEnd = endDate.toISOString().slice(0, 10);
+  const isCacheFresh = cached && Date.now() - cached.timestamp < BCB_CACHE_TTL;
+  const cacheCoversRequest = isCacheFresh
+    && cached.startDate <= requestedStart
+    && cached.endDate >= requestedEnd;
 
-  responses.flat().forEach((item) => {
-    if (item?.data && item?.valor != null) unique.set(item.data, item);
-  });
+  if (cacheCoversRequest) return cached.data;
 
-  return [...unique.values()].sort((first, second) => {
-    const firstDate = first.data.split('/').reverse().join('-');
-    const secondDate = second.data.split('/').reverse().join('-');
-    return firstDate.localeCompare(secondDate);
-  });
+  try {
+    const chunks = splitDateRange(startDate, endDate);
+    const responses = await Promise.all(
+      chunks.map(({ start, end }) => fetchBcbChunk(series, start, end))
+    );
+    const unique = new Map();
+
+    [...(cached?.data || []), ...responses.flat()].forEach((item) => {
+      if (item?.data && item?.valor != null) unique.set(item.data, item);
+    });
+
+    const data = [...unique.values()].sort((first, second) => {
+      const firstDate = first.data.split('/').reverse().join('-');
+      const secondDate = second.data.split('/').reverse().join('-');
+      return firstDate.localeCompare(secondDate);
+    });
+    const coverageStart = cached?.startDate && cached.startDate < requestedStart
+      ? cached.startDate
+      : requestedStart;
+    const coverageEnd = cached?.endDate && cached.endDate > requestedEnd
+      ? cached.endDate
+      : requestedEnd;
+
+    bcbSeriesCache.set(cacheKey, {
+      data,
+      timestamp: Date.now(),
+      startDate: coverageStart,
+      endDate: coverageEnd
+    });
+    return data;
+  } catch {
+    return cached?.data || [];
+  }
 };
 
 const readJsonBody = (request, maxBytes = 1024 * 1024) => new Promise((resolve, reject) => {
