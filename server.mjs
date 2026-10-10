@@ -51,6 +51,7 @@ const MAX_CHUNK_YEARS = 5;
 const QUOTE_CACHE_TTL = 60 * 1000;
 const EVOLUTION_CACHE_TTL = 60 * 60 * 1000;
 const BCB_CACHE_TTL = 24 * 60 * 60 * 1000;
+const EXCHANGE_RATES_CACHE_TTL = 24 * 60 * 60 * 1000;
 const evolutionCache = new Map();
 const bcbSeriesCache = new Map();
 const historicalQuoteCache = new Map();
@@ -1302,33 +1303,52 @@ const handleCoinGeckoRequest = async (request, response) => {
   };
 
   const handleExchangeRatesRequest = async (_request, response) => {
-    const cached = readCachedValue(exchangeRatesCache, 'rates');
-    if (cached) {
-      sendJson(response, 200, cached);
+    const cacheKey = 'exchange-rates';
+    const cached = exchangeRatesCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < EXCHANGE_RATES_CACHE_TTL) {
+      console.log('[exchange-rates] Retornando cotação do cache.');
+      sendJson(response, 200, cached.data);
       return;
     }
 
-    try {
-      const upstream = await fetch(
-        'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,GBP-BRL,CAD-BRL',
-        { headers: { Accept: 'application/json' } }
-      );
-      if (!upstream.ok) {
-        sendJson(response, 502, { error: `AwesomeAPI respondeu HTTP ${upstream.status}.` });
-        return;
-      }
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const upstream = await fetch(
+          'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,GBP-BRL,CAD-BRL',
+          {
+            headers: { Accept: 'application/json' },
+            signal: AbortSignal.timeout(10_000)
+          }
+        );
+        if (!upstream.ok) {
+          throw new Error(`AwesomeAPI respondeu HTTP ${upstream.status}.`);
+        }
 
-      const rates = await upstream.json();
-      if (!rates?.USDBRL || !rates?.EURBRL) {
-        sendJson(response, 502, { error: 'AwesomeAPI retornou dados de câmbio inválidos.' });
-        return;
-      }
+        const rates = await upstream.json();
+        if (!rates?.USDBRL || !rates?.EURBRL) {
+          throw new Error('AwesomeAPI retornou dados de câmbio inválidos.');
+        }
 
-      writeCachedValue(exchangeRatesCache, 'rates', rates);
-      sendJson(response, 200, rates);
-    } catch (error) {
-      sendJson(response, 502, { error: error.message || 'Falha ao consultar a AwesomeAPI.' });
+        exchangeRatesCache.set(cacheKey, { data: rates, timestamp: Date.now() });
+        sendJson(response, 200, rates);
+        return;
+      } catch (error) {
+        lastError = error;
+        console.error(`[exchange-rates] Tentativa ${attempt}/3 falhou:`, error.message || error);
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 2_000));
+        }
+      }
     }
+
+    if (cached) {
+      console.log('[exchange-rates] Usando cache expirado após falha na AwesomeAPI.');
+      sendJson(response, 200, cached.data);
+      return;
+    }
+
+    sendJson(response, 502, { error: lastError?.message || 'Falha ao consultar a AwesomeAPI.' });
   };
 
   const server = createServer((request, response) => {
