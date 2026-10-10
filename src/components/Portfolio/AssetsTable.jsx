@@ -165,21 +165,21 @@ export default function AssetsTable({
         </button>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="max-h-[500px] overflow-auto">
         <table className="w-full text-left text-xs whitespace-nowrap min-w-0">
           <thead className="bg-slate-900/60 text-slate-400 uppercase border-b border-slate-800">
             <tr>
-              <th className="p-2.5 w-28">{t.tipo}</th>
-              <th className="p-2.5 min-w-[120px]">{t.ticker}</th>
-              <th className="p-2.5 text-right">{t.qtd}</th>
-              <th className="p-2.5 text-right">{t.pm}</th>
-              <th className="p-2.5 text-center">DATA COMPRA</th>
-              <th className="p-2.5 text-right">{t.cotacao}</th>
-              <th className="p-2.5 text-right">{t.valorTotal}</th>
-              <th className="p-2.5 text-right">{t.lucroPrejuizo}</th>
-              <th className="p-2.5 text-center">{t.pctAtual}</th>
-              <th className="p-2.5 text-center">{t.meta}</th>
-              <th className="p-2.5 text-right w-32">{t.acoes}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 w-28">{t.tipo}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 min-w-[120px]">{t.ticker}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.qtd}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.pm}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-center">DATA COMPRA</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.cotacao}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.valorTotal}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.lucroPrejuizo}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-center">{t.pctAtual}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-center">{t.meta}</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right w-32">{t.acoes}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">

@@ -143,7 +143,7 @@ export default function ProventosPage({
 
       <div className={`p-6 rounded-2xl border space-y-3 ${cardClass}`}>
         <h3 className="font-bold text-sm">{t.extratoEntradas}</h3>
-        <div className="space-y-2">
+        <div className="max-h-[400px] space-y-2 overflow-auto">
           {proventos && proventos.length > 0 ? (
             proventos.map((p) => (
               <div

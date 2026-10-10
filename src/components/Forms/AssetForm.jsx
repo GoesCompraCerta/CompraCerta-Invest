@@ -8,6 +8,24 @@ const TYPE_LABELS = {
   Cripto: 'tipoCripto', 'Ações (EUA / Globais)': 'tipoAcoesEuaGlobais',
   'REITs (EUA / Globais)': 'tipoReitsEuaGlobais', 'ETFs (EUA / Globais)': 'tipoEtfsEuaGlobais'
 };
+const LAST_ASSET_TYPE_KEY = 'goes_compra_certa_last_asset_type';
+
+const getLastAssetType = () => {
+  try {
+    const lastAssetType = localStorage.getItem(LAST_ASSET_TYPE_KEY);
+    return ASSET_TYPES.includes(lastAssetType) ? lastAssetType : '';
+  } catch {
+    return '';
+  }
+};
+
+const saveLastAssetType = (type) => {
+  try {
+    localStorage.setItem(LAST_ASSET_TYPE_KEY, type);
+  } catch {
+    // Keep the form usable when browser storage is unavailable.
+  }
+};
 
 const CONDITIONAL_FIELDS = {
   'Ações (B3)': [
@@ -41,6 +59,14 @@ const isForeignAsset = (type) => [
 ].includes(type);
 
 export default function AssetForm({ onSubmit, editingId, onCancel, formData, onFormChange, onTypeChange, pmAlreadyInBrl, priceAlreadyInBrl, themeStyle, t }) {
+  React.useEffect(() => {
+    if (editingId) return;
+    const lastAssetType = getLastAssetType();
+    if (lastAssetType && formData.type !== lastAssetType) {
+      onFormChange({ ...formData, type: lastAssetType });
+    }
+  }, [editingId, formData.type, onFormChange]);
+
   const handleChange = (field, value) => onFormChange({ ...formData, [field]: value });
   const cryptoAsset = isCrypto(formData.type, formData.ticker);
   const internationalAsset = isForeignAsset(formData.type);
@@ -75,6 +101,7 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
   };
 
   const handleTypeChange = (type) => {
+    saveLastAssetType(type);
     const clearedFields = Object.keys(formData).reduce((result, field) => ({ ...result, [field]: '' }), {});
     onFormChange({
       ...formData,
