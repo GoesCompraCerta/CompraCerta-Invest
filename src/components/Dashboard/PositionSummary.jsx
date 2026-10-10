@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { getChartColor } from '../../utils/colors';
+import { ASSET_TYPE_TRANSLATION_KEYS } from '../../constants/translations';
 import CurrencyWidget from './CurrencyWidget';
 
 export default function PositionSummary({
@@ -7,6 +8,7 @@ export default function PositionSummary({
   formatMoney,
   isDarkMode,
   cardClass,
+  lang,
   t
 }) {
   const sortedAssets = useMemo(
@@ -33,11 +35,11 @@ export default function PositionSummary({
                   <div className="font-bold text-white">
                     {item.ticker}{' '}
                     <span className="text-[10px] font-normal text-slate-400">
-                      ({item.type})
+                      ({t[ASSET_TYPE_TRANSLATION_KEYS[item.type]] || item.type})
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    PM: {formatMoney(item.pm)} | Cot: {formatMoney(item.price)}
+                    {t.averagePriceShort} {formatMoney(item.pm)} | {t.currentPriceShort} {formatMoney(item.price)}
                   </div>
                 </div>
               </div>
@@ -55,7 +57,7 @@ export default function PositionSummary({
           </div>
         )}
       </div>
-      <CurrencyWidget />
+      <CurrencyWidget t={t} lang={lang} />
     </div>
   );
 }

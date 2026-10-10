@@ -1,6 +1,7 @@
 import React from 'react';
 import { Edit3, Trash2, Download, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { normalizeFiiDyPeriod } from '../../services/calculationService';
+import { ASSET_TYPE_TRANSLATION_KEYS } from '../../constants/translations';
 
 const formatMetric = (value, suffix = '') => {
   if (value === null || value === undefined || value === '') return '-';
@@ -9,18 +10,12 @@ const formatMetric = (value, suffix = '') => {
   return Number.isFinite(number) ? `${number.toFixed(2)}${suffix}` : '-';
 };
 
-const TYPE_LABELS = {
-  'Ação BR': 'Ação (B3)', 'Ações (B3)': 'Ação (B3)', FII: 'FII (B3)', 'FIIs (B3)': 'FII (B3)', ETF: 'ETF (B3)', 'ETF (B3)': 'ETF (B3)', 'ETFs (B3)': 'ETF (B3)', 'ETF Nacional': 'ETF (B3)', 'Renda Fixa': 'Renda Fixa',
-  Cripto: 'Cripto', Stocks: 'Ação (EUA)',
-  'Ações Internacionais': 'Ação (EUA)', 'Ações (EUA / Globais)': 'Ação (EUA)', 'ETF Internacional': 'ETF (EUA)', 'ETFs (EUA / Globais)': 'ETF (EUA)', Internacional: 'Ação (EUA)',
-  REITs: 'REIT (EUA)', 'REITs (EUA / Globais)': 'REIT (EUA)', BDR: 'BDR (B3)', 'BDRs (B3)': 'BDR (B3)'
-};
-
 const formatDate = (value) => value || '-';
-const formatPurchaseDate = (value) => {
+const formatPurchaseDate = (value, lang) => {
   if (!value) return '—';
   const [year, month, day] = String(value).slice(0, 10).split('-');
-  return year && month && day ? `${day}/${month}/${year}` : '—';
+  if (!year || !month || !day) return '—';
+  return lang === 'en' ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
 };
 const formatPercent = (value, digits = 2) => {
   if (value === null || value === undefined || value === '') return '-';
@@ -28,21 +23,21 @@ const formatPercent = (value, digits = 2) => {
   return Number.isFinite(number) ? `${number.toFixed(digits)}%` : '-';
 };
 
-const formatCompactCurrency = (value) => {
+const formatCompactCurrency = (value, t, lang) => {
   if (value === null || value === undefined || value === '') return '-';
   const number = Number(value);
   if (!Number.isFinite(number)) return '-';
 
   const formatCompactNumber = (amount) =>
-    Number(amount).toLocaleString('pt-BR', {
+    Number(amount).toLocaleString(lang === 'en' ? 'en-US' : 'pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
 
-  if (Math.abs(number) >= 1000000000) return `R$ ${formatCompactNumber(number / 1000000000)} bi`;
-  if (Math.abs(number) >= 1000000) return `R$ ${formatCompactNumber(number / 1000000)} mi`;
-  if (Math.abs(number) >= 1000) return `R$ ${formatCompactNumber(number / 1000)} mil`;
-  return `R$ ${number.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (Math.abs(number) >= 1000000000) return `R$ ${formatCompactNumber(number / 1000000000)} ${t.compactBillion}`;
+  if (Math.abs(number) >= 1000000) return `R$ ${formatCompactNumber(number / 1000000)} ${t.compactMillion}`;
+  if (Math.abs(number) >= 1000) return `R$ ${formatCompactNumber(number / 1000)} ${t.compactThousand}`;
+  return `R$ ${number.toLocaleString(lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const formatConcentration = (value) => {
@@ -54,6 +49,29 @@ const formatConcentration = (value) => {
 const isStock = (type) => type === 'Ação BR' || type === 'Ações (B3)' || type === 'Stocks' || type === 'Ações Internacionais' || type === 'Ações (EUA / Globais)';
 const isFii = (type) => type === 'FII' || type === 'FIIs' || type === 'FIIs (B3)' || type === 'Fundo Imobiliário' || type === 'REITs (EUA / Globais)';
 const isFixedIncome = (type) => type === 'Renda Fixa' || type === 'Renda Fixa (B3)';
+const DETAIL_METRIC_TRANSLATIONS = {
+  'P/L': 'priceEarningsMetric',
+  'P/VP': 'priceBookMetric',
+  LPA: 'epsMetric',
+  VPA: 'bvpsMetric',
+  'Tx. Cresc.': 'growthMetric',
+  'Dív. Líq./EBITDA': 'divEbitda',
+  'DY Recorrente': 'fiiRecurringYieldShort',
+  'P/VP Ajustado': 'fiiAdjustedPvp',
+  Vacância: 'fiiVacancy',
+  'Liquidez Diária': 'fiiDailyLiquidity',
+  Alavancagem: 'fiiLeverage',
+  Concentração: 'fiiConcentration',
+  'Patrimônio Real': 'patrimonioReal',
+  'Taxa de Rentabilidade': 'taxaRentabilidade',
+  'Data de Vencimento': 'dataVencimento'
+};
+const translateDetailMetric = (label, t) => {
+  if (label === 'DY 12M' || label === 'DY 24M') {
+    return t.dyPeriodLabel.replace('{period}', label.slice(3));
+  }
+  return t[DETAIL_METRIC_TRANSLATIONS[label]] || label;
+};
 
 const getFiiDyCard = (item) => {
   const selectedPeriod = normalizeFiiDyPeriod(item?.dyPeriod || (
@@ -113,11 +131,11 @@ const detailMetricsForItem = (item) => {
   return metrics;
 };
 
-const formatDetailValue = (key, value) => {
+const formatDetailValue = (key, value, t, lang) => {
   if (value === null || value === undefined || value === '') return '-';
 
   if (key === 'Liquidez Diária' || key === 'Patrimônio Real') {
-    return formatCompactCurrency(value);
+    return formatCompactCurrency(value, t, lang);
   }
 
   if ([
@@ -173,7 +191,7 @@ export default function AssetsTable({
               <th className="sticky top-0 z-10 bg-slate-900 p-2.5 min-w-[120px]">{t.ticker}</th>
               <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.qtd}</th>
               <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.pm}</th>
-              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-center">DATA COMPRA</th>
+              <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-center">{t.purchaseDate}</th>
               <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.cotacao}</th>
               <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.valorTotal}</th>
               <th className="sticky top-0 z-10 bg-slate-900 p-2.5 text-right">{t.lucroPrejuizo}</th>
@@ -187,7 +205,7 @@ export default function AssetsTable({
               assetList.map((item) => {
                 const isExpanded = expandedAssetId === item.id;
                 const metaPercent = item.metaPercent ?? item.meta ?? 0;
-                const assetTypeLabel = TYPE_LABELS[item.type] || item.type || '-';
+                const assetTypeLabel = t[ASSET_TYPE_TRANSLATION_KEYS[item.type]] || item.type || '-';
 
                 return (
                   <React.Fragment key={item.id}>
@@ -207,7 +225,7 @@ export default function AssetsTable({
                       </td>
                       <td className="p-2.5 text-right text-slate-200">{item.qty}</td>
                       <td className="p-2.5 text-right text-slate-200">{formatMoney(item.pm)}</td>
-                      <td className="p-2.5 text-center text-slate-200">{formatPurchaseDate(item.buyDate)}</td>
+                      <td className="p-2.5 text-center text-slate-200">{formatPurchaseDate(item.buyDate, lang)}</td>
                       <td className="p-2.5 text-right text-slate-200">{formatMoney(item.price)}</td>
                       <td className="p-2.5 text-right font-bold text-slate-100">{formatMoney(item.valorTotal)}</td>
                       <td
@@ -232,8 +250,8 @@ export default function AssetsTable({
                             type="button"
                             onClick={() => toggleAsset(item.id)}
                             className="flex items-center justify-center rounded-lg border border-slate-700 bg-slate-900/70 p-1.5 text-slate-300 hover:border-sky-500 hover:text-sky-400 transition-colors"
-                            aria-label={isExpanded ? 'Fechar análise' : 'Ver análise'}
-                            title={isExpanded ? 'Fechar análise' : 'Ver análise'}
+                            aria-label={isExpanded ? t.closeAnalysis : t.viewAnalysis}
+                            title={isExpanded ? t.closeAnalysis : t.viewAnalysis}
                           >
                             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           </button>
@@ -275,7 +293,7 @@ export default function AssetsTable({
                           <div className="bg-slate-950/80 px-4 py-3">
                             <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
                               <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
-                                INDICADORES FUNDAMENTALISTAS
+                                {t.analysisIndicators}
                               </span>
                               <div className="flex items-center gap-2">
                                 {isFii(item.type) && (
@@ -293,7 +311,7 @@ export default function AssetsTable({
                                   key={`${item.id}-${label}`}
                                   className="min-h-[72px] rounded-xl border border-slate-800 bg-slate-900/70 p-2.5 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]"
                                 >
-                                  <div className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{label}</div>
+                                  <div className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{translateDetailMetric(label, t)}</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-100 truncate">
                                     {formatDetailValue(label, value)}
                                   </div>

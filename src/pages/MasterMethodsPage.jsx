@@ -2,15 +2,7 @@ import React from 'react';
 import { BarChart3 } from 'lucide-react';
 import MethodCard from '../components/Common/MethodCard';
 import { calculateMasterMethods } from '../services/calculationService';
-
-const TYPE_LABELS = {
-  'Ação BR': 'Ação (B3)',
-  'Ações (B3)': 'Ação (B3)',
-  Acao: 'Ação (B3)',
-  Stocks: 'Ação (EUA)',
-  'Ações Internacionais': 'Ação (EUA)',
-  'Ações (EUA / Globais)': 'Ação (EUA)'
-};
+import { ASSET_TYPE_TRANSLATION_KEYS } from '../constants/translations';
 
 export default function MasterMethodsPage({
   assets,
@@ -83,7 +75,7 @@ export default function MasterMethodsPage({
                                   : 'bg-slate-200 text-slate-600'
                               }`}
                             >
-                              {TYPE_LABELS[asset.type] || asset.type}
+                              {t[ASSET_TYPE_TRANSLATION_KEYS[asset.type]] || asset.type}
                             </span>
                           </div>
                           <span className="text-[10px] text-slate-400 whitespace-nowrap">
@@ -187,9 +179,7 @@ export default function MasterMethodsPage({
 
                 <div className="p-2.5 mt-3 mb-6 text-[10.5px] leading-snug rounded-md border border-gray-700/60 bg-gray-100/80 text-gray-800 flex items-start gap-2 dark:border-gray-800 dark:bg-gray-900/40 dark:text-gray-200">
                   <span className="text-yellow-500 font-bold shrink-0">⚠️</span>
-                  <p>
-                    Esta ferramenta foi desenvolvida para elevar o seu nível de autonomia através de dados numéricos inteligentes para potencializar sua análise, mas não substitui seu critério fundamentalista. Não a utilize como recomendação de compra ou venda; a decisão final é sempre sua!
-                  </p>
+                  <p>{t.investmentAnalysisDisclaimer}</p>
                 </div>
               </React.Fragment>
             ));

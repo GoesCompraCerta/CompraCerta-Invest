@@ -40,6 +40,7 @@ export default function PortfolioPage({
   themeStyle,
   cardClass,
   t,
+  lang,
   proventos,
   onAddAsset,
   onUpdateAsset,
@@ -129,7 +130,7 @@ export default function PortfolioPage({
         if (!exchangeRate) throw new Error(`Cotação ${originalCurrency}BRL indisponível`);
       } catch (error) {
         console.error('Erro ao converter valores para BRL:', error);
-        window.alert('Não foi possível converter os valores para R$. Verifique sua conexão e tente novamente.');
+        window.alert(t.exchangeConversionError);
         return;
       }
     }
@@ -250,7 +251,7 @@ export default function PortfolioPage({
         editPrice = Number(item.price) / exchangeRate;
       } catch (error) {
         console.error('Erro ao converter valores para a moeda original:', error);
-        window.alert('Não foi possível carregar os valores em moeda estrangeira. Verifique sua conexão e tente novamente.');
+        window.alert(t.exchangeLoadForeignError);
         return;
       }
     }
@@ -347,7 +348,7 @@ export default function PortfolioPage({
 
   const handleExportExcel = async () => {
     if (totals.list.length === 0 && (!proventos || proventos.length === 0)) return;
-    await exportPortfolioToExcel(totals.list, proventos);
+    await exportPortfolioToExcel(totals.list, proventos, t);
   };
 
   return (
@@ -367,14 +368,15 @@ export default function PortfolioPage({
         />
       </div>
 
-      {assetsLoading && <p role="status" className="text-xs text-slate-400">Carregando ativos salvos...</p>}
-      {assetsError && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-500">{assetsError}</p>}
+      {assetsLoading && <p role="status" className="text-xs text-slate-400">{t.portfolioLoadingAssets}</p>}
+      {assetsError && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-500">{t[assetsError] || t.authGenericError}</p>}
 
       <AssetsTable
         assets={totals.list}
         formatMoney={formatMoney}
         cardClass={cardClass}
         t={t}
+        lang={lang}
         onEdit={handleEditAsset}
         onDelete={onDeleteAsset}
         onUpdateQuote={(item) => onUpdateQuote(item, onUpdateAsset)}

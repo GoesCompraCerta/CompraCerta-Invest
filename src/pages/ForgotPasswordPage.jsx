@@ -52,7 +52,7 @@ export default function ForgotPasswordPage({ t, lang, setLang, isDarkMode, setIs
                 <span className="mb-1.5 block text-xs font-bold">{t.email}</span>
                 <span className="relative block">
                   <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true" />
-                  <input className={fieldClass} type="email" autoComplete="email" placeholder="nome@exemplo.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
+                  <input className={fieldClass} type="email" autoComplete="email" placeholder={t.emailExamplePlaceholder} value={email} onChange={(event) => setEmail(event.target.value)} required />
                 </span>
               </label>
               {error && <p role="alert" className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-500">{error}</p>}

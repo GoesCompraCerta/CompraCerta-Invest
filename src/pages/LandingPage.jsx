@@ -15,6 +15,21 @@ import {
 
 const COPY = {
   pt: {
+    navigationLabel: 'Navegação principal',
+    homeLabel: 'Página inicial CompraCerta-Invest',
+    changeLanguage: 'Mudar idioma',
+    investedAmount: 'R$ 48.250',
+    portfolioReturn: '+8,42%',
+    assetCount: '12 ativos',
+    monthsCount: '12 meses',
+    monthlyPrice: 'R$ 19,99',
+    annualPrice: 'R$ 191,88',
+    benchmarkItems: [
+      { label: 'Sua carteira', value: '8,42%', color: 'bg-emerald-500', width: 'w-[84%]' },
+      { label: 'Ibovespa', value: '6,18%', color: 'bg-sky-500', width: 'w-[62%]' },
+      { label: 'CDI', value: '5,42%', color: 'bg-amber-500', width: 'w-[54%]' },
+      { label: 'IPCA', value: '2,11%', color: 'bg-rose-400', width: 'w-[22%]' }
+    ],
     signIn: 'Entrar',
     startFree: 'Começar grátis',
     eyebrow: 'INVESTIR COM MAIS CLAREZA',
@@ -54,6 +69,21 @@ const COPY = {
     chartLabel: 'Evolução ilustrativa da carteira'
   },
   en: {
+    navigationLabel: 'Main navigation',
+    homeLabel: 'CompraCerta-Invest home',
+    changeLanguage: 'Change language',
+    investedAmount: 'R$ 48,250',
+    portfolioReturn: '+8.42%',
+    assetCount: '12 assets',
+    monthsCount: '12 months',
+    monthlyPrice: 'R$ 19.99',
+    annualPrice: 'R$ 191.88',
+    benchmarkItems: [
+      { label: 'Your portfolio', value: '8.42%', color: 'bg-emerald-500', width: 'w-[84%]' },
+      { label: 'Ibovespa', value: '6.18%', color: 'bg-sky-500', width: 'w-[62%]' },
+      { label: 'CDI', value: '5.42%', color: 'bg-amber-500', width: 'w-[54%]' },
+      { label: 'IPCA', value: '2.11%', color: 'bg-rose-400', width: 'w-[22%]' }
+    ],
     signIn: 'Sign in',
     startFree: 'Get started free',
     eyebrow: 'INVEST WITH MORE CLARITY',
@@ -105,13 +135,13 @@ export default function LandingPage({ lang, setLang, isDarkMode, setIsDarkMode }
   return (
     <div className={`min-h-screen ${background}`}>
       <header className={`border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-        <nav className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8" aria-label="Main navigation">
-          <a href="/" className="flex items-center gap-2.5" aria-label="CompraCerta-Invest home">
+        <nav className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8" aria-label={copy.navigationLabel}>
+          <a href="/" className="flex items-center gap-2.5" aria-label={copy.homeLabel}>
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500 text-slate-950"><TrendingUp className="h-5 w-5" aria-hidden="true" /></span>
             <span className="leading-tight"><span className="block text-sm font-black tracking-wide">COMPRACERTA</span><span className="text-[10px] font-bold text-emerald-500">INVEST</span></span>
           </a>
           <div className="flex items-center gap-1 sm:gap-2">
-            <button type="button" onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')} className={`flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-bold ${textMuted} hover:bg-slate-500/10`} aria-label={lang === 'pt' ? 'Change language' : 'Alterar idioma'} title={lang === 'pt' ? 'Change language' : 'Alterar idioma'}><Languages className="h-4 w-4" />{lang.toUpperCase()}</button>
+            <button type="button" onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')} className={`flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-bold ${textMuted} hover:bg-slate-500/10`} aria-label={copy.changeLanguage} title={copy.changeLanguage}><Languages className="h-4 w-4" />{lang.toUpperCase()}</button>
             <button type="button" onClick={() => setIsDarkMode((current) => !current)} className={`flex h-9 w-9 items-center justify-center rounded-md ${textMuted} hover:bg-slate-500/10`} aria-label={isDarkMode ? copy.lightMode : copy.darkMode} title={isDarkMode ? copy.lightMode : copy.darkMode}>{isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
             <a href="/login" className={`hidden rounded-md px-3 py-2 text-sm font-bold sm:inline-flex ${textMuted} hover:text-emerald-500`}>{copy.signIn}</a>
             <a href="/register" className="rounded-md bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950 transition hover:bg-emerald-400 sm:px-4 sm:text-sm">{copy.startFree}</a>
@@ -137,13 +167,13 @@ export default function LandingPage({ lang, setLang, isDarkMode, setIsDarkMode }
             <div className="grid gap-0 md:grid-cols-[1fr_1.4fr]">
               <div className={`grid grid-cols-2 gap-px ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}>
                 <div className={isDarkMode ? 'bg-[#111827] p-5 sm:p-6' : 'bg-white p-5 sm:p-6'}>
-                  <p className={`text-xs ${textMuted}`}>{copy.invested}</p><p className="mt-2 text-2xl font-black">R$ 48.250</p><p className="mt-2 text-xs font-bold text-emerald-500">12 ativos</p>
+                  <p className={`text-xs ${textMuted}`}>{copy.invested}</p><p className="mt-2 text-2xl font-black">{copy.investedAmount}</p><p className="mt-2 text-xs font-bold text-emerald-500">{copy.assetCount}</p>
                 </div>
                 <div className={isDarkMode ? 'bg-[#111827] p-5 sm:p-6' : 'bg-white p-5 sm:p-6'}>
-                  <p className={`text-xs ${textMuted}`}>{copy.returnLabel}</p><p className="mt-2 text-2xl font-black text-emerald-500">+8,42%</p><p className={`mt-2 text-xs ${textMuted}`}>12 meses</p>
+                  <p className={`text-xs ${textMuted}`}>{copy.returnLabel}</p><p className="mt-2 text-2xl font-black text-emerald-500">{copy.portfolioReturn}</p><p className={`mt-2 text-xs ${textMuted}`}>{copy.monthsCount}</p>
                 </div>
                 <div className={`col-span-2 p-5 sm:p-6 ${isDarkMode ? 'bg-[#111827]' : 'bg-white'}`}>
-                  <div className="flex items-center justify-between gap-2"><p className="text-sm font-bold">{copy.chartLabel}</p><span className="rounded-sm bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-500">+8,42%</span></div>
+                  <div className="flex items-center justify-between gap-2"><p className="text-sm font-bold">{copy.chartLabel}</p><span className="rounded-sm bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-500">{copy.portfolioReturn}</span></div>
                   <div className="mt-5 flex h-20 items-end gap-1.5" aria-hidden="true">
                     {CHART_BARS.map((height, index) => <span key={index} className={`flex-1 rounded-t-sm ${index === CHART_BARS.length - 1 ? 'bg-emerald-400' : 'bg-emerald-500/35'}`} style={{ height: `${height}%` }} />)}
                   </div>
@@ -152,12 +182,7 @@ export default function LandingPage({ lang, setLang, isDarkMode, setIsDarkMode }
               <div className={`p-5 sm:p-6 ${isDarkMode ? 'bg-slate-900/30' : 'bg-slate-50'}`}>
                 <div className="flex items-center justify-between gap-2"><p className="text-sm font-bold">{copy.benchmark}</p><span className={`text-[10px] ${textMuted}`}>12M</span></div>
                 <div className="mt-5 space-y-4">
-                  {[
-                    ['Sua carteira', '8,42%', 'bg-emerald-500', 'w-[84%]'],
-                    ['Ibovespa', '6,18%', 'bg-sky-500', 'w-[62%]'],
-                    ['CDI', '5,42%', 'bg-amber-500', 'w-[54%]'],
-                    ['IPCA', '2,11%', 'bg-rose-400', 'w-[22%]']
-                  ].map(([label, value, color, width]) => (
+                  {copy.benchmarkItems.map(({ label, value, color, width }) => (
                     <div key={label}>
                       <div className="mb-1.5 flex items-center justify-between gap-3 text-xs"><span className={textMuted}>{label}</span><span className="font-bold">{value}</span></div>
                       <div className={`h-1.5 overflow-hidden rounded-sm ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className={`h-full rounded-sm ${color} ${width}`} /></div>
@@ -193,13 +218,13 @@ export default function LandingPage({ lang, setLang, isDarkMode, setIsDarkMode }
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             <article className={`rounded-lg border p-6 sm:p-7 ${panelClass}`}>
               <h3 className="text-sm font-bold">{copy.monthly}</h3>
-              <p className="mt-5 text-4xl font-black">R$ 19,99<span className={`ml-1 text-sm font-semibold ${textMuted}`}>{copy.perMonth}</span></p>
+              <p className="mt-5 text-4xl font-black">{copy.monthlyPrice}<span className={`ml-1 text-sm font-semibold ${textMuted}`}>{copy.perMonth}</span></p>
               <a href="/register" className={`mt-6 flex min-h-11 items-center justify-center rounded-md border px-4 py-2.5 text-sm font-bold transition ${isDarkMode ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-300 hover:bg-slate-50'}`}>{copy.monthlyCta}</a>
             </article>
             <article className="relative rounded-lg border border-emerald-500/50 bg-emerald-500/[0.06] p-6 sm:p-7">
               <span className="absolute right-5 top-5 rounded-sm bg-emerald-500 px-2 py-1 text-[10px] font-black text-slate-950">{copy.save}</span>
               <h3 className="text-sm font-bold">{copy.annual}</h3>
-              <p className="mt-5 text-4xl font-black">R$ 191,88<span className={`ml-1 text-sm font-semibold ${textMuted}`}>{copy.perYear}</span></p>
+              <p className="mt-5 text-4xl font-black">{copy.annualPrice}<span className={`ml-1 text-sm font-semibold ${textMuted}`}>{copy.perYear}</span></p>
               <a href="/register" className="mt-6 flex min-h-11 items-center justify-center gap-2 rounded-md bg-emerald-500 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-emerald-400">{copy.annualCta}<ArrowRight className="h-4 w-4" aria-hidden="true" /></a>
             </article>
           </div>

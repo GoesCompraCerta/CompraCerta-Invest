@@ -9,6 +9,7 @@ export default function DashboardPage({
   themeStyle,
   cardClass,
   isDarkMode,
+  lang,
   pieRadiusLevel,
   setPieRadiusLevel,
   t
@@ -30,6 +31,7 @@ export default function DashboardPage({
           formatMoney={formatMoney}
           isDarkMode={isDarkMode}
           cardClass={cardClass}
+          lang={lang}
           t={t}
         />
       </div>

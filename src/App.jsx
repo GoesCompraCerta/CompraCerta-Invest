@@ -291,7 +291,7 @@ export default function App() {
   // ═════════════════════════════════════════════════════════════════════════════
   return (
     <>
-      {showOpeningIntro && <OpeningIntro onFinish={() => setShowOpeningIntro(false)} />}
+      {showOpeningIntro && <OpeningIntro t={t} onFinish={() => setShowOpeningIntro(false)} />}
       <ProtectedRoute
         isAuthenticated={isAuthenticated}
         isLoading={isAuthChecking}
@@ -343,6 +343,7 @@ export default function App() {
             themeStyle={themeStyle}
             cardClass={cardClass}
             isDarkMode={isDarkMode}
+            lang={lang}
             pieRadiusLevel={pieRadiusLevel}
             setPieRadiusLevel={setPieRadiusLevel}
             privacyMode={privacyMode}
@@ -359,6 +360,7 @@ export default function App() {
             themeStyle={themeStyle}
             cardClass={cardClass}
             t={t}
+            lang={lang}
             proventos={proventos}
             onAddAsset={addAsset}
             onUpdateAsset={updateAsset}

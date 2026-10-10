@@ -118,9 +118,7 @@ export const useAssets = () => {
       if (localFallback.length > 0) {
         setAssets(localFallback);
       }
-      setError(loadError?.status === 401
-        ? 'Entre novamente para carregar seus ativos salvos.'
-        : loadError?.message || 'Não foi possível carregar os ativos. Tente novamente.');
+      setError(loadError?.status === 401 ? 'assetsLoginError' : 'assetsLoadingError');
       return null;
     } finally {
       setIsLoading(false);
@@ -140,12 +138,10 @@ export const useAssets = () => {
       details[id] = getSupplementaryDetails(newAsset);
       const savedDetails = assetDetailsStorage.set(details);
       setAssets((current) => [...normalizeAssetList(current), ...mergeBackendAssets([created], details)]);
-      if (!savedDetails) setError('Ativo salvo no servidor, mas alguns detalhes locais não puderam ser guardados.');
+      if (!savedDetails) setError('assetDetailsSaveError');
       return created;
     } catch (saveError) {
-      setError(saveError?.status === 401
-        ? 'Sua sessão expirou. Entre novamente para cadastrar o ativo.'
-        : saveError?.message || 'Não foi possível cadastrar o ativo. Tente novamente.');
+      setError(saveError?.status === 401 ? 'assetsLoginError' : 'assetCreateError');
       return null;
     }
   }, []);
@@ -153,7 +149,7 @@ export const useAssets = () => {
   const updateAssetRecord = useCallback(async (assetId, updates) => {
     const currentAsset = normalizeAssetList(assets).find((asset) => String(asset.id) === String(assetId));
     if (!currentAsset) {
-      setError('Não foi possível localizar o ativo para atualizar.');
+      setError('assetNotFoundError');
       return null;
     }
 
@@ -168,12 +164,10 @@ export const useAssets = () => {
       setAssets((current) => normalizeAssetList(current).map((asset) =>
         String(asset.id) === String(assetId) ? merged : asset
       ));
-      if (!savedDetails) setError('Ativo atualizado no servidor, mas alguns detalhes locais não puderam ser guardados.');
+      if (!savedDetails) setError('assetDetailsSaveError');
       return merged;
     } catch (saveError) {
-      setError(saveError?.status === 401
-        ? 'Sua sessão expirou. Entre novamente para atualizar o ativo.'
-        : saveError?.message || 'Não foi possível atualizar o ativo. Tente novamente.');
+      setError(saveError?.status === 401 ? 'assetsLoginError' : 'assetUpdateError');
       return null;
     }
   }, [assets]);
@@ -188,9 +182,7 @@ export const useAssets = () => {
       setAssets((current) => normalizeAssetList(current).filter((asset) => String(asset.id) !== String(assetId)));
       return true;
     } catch (deleteError) {
-      setError(deleteError?.status === 401
-        ? 'Sua sessão expirou. Entre novamente para remover o ativo.'
-        : deleteError?.message || 'Não foi possível remover o ativo. Tente novamente.');
+      setError(deleteError?.status === 401 ? 'assetsLoginError' : 'assetDeleteError');
       return false;
     }
   }, []);

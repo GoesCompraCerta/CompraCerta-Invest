@@ -5,7 +5,7 @@ import { login } from '../services/authService';
 const friendlyError = (error, t) => {
   if (error.status === 401) return t.authInvalidCredentials;
   if (error.status === 0 || error instanceof TypeError) return t.authNetworkError;
-  return error.message || t.authGenericError;
+  return t.authGenericError;
 };
 
 export default function LoginPage({ t, lang, setLang, isDarkMode, setIsDarkMode, onAuthenticated, navigate }) {

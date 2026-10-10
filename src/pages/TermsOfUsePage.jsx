@@ -194,7 +194,7 @@ export default function TermsOfUsePage({
           <section className={sectionClass}>
             <h2 className={headingClass}>12. Jurisdiction and contact</h2>
             <p>These Terms are governed by Brazilian law.</p>
-            <p>Jurisdiction: District of [your-city/state]</p>
+            <p>Jurisdiction: District of Cabo Frio/RJ.</p>
             <p>Contact: <a className="font-semibold text-emerald-500" href="mailto:goescompracerta@hotmail.com">goescompracerta@hotmail.com</a></p>
           </section>
         </>

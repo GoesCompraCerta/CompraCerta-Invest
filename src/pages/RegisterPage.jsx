@@ -11,7 +11,7 @@ const getPasswordStrength = (password) => {
 const friendlyError = (error, t) => {
   if (error.status === 400 && /cadastrad|already exists|already registered/i.test(error.message)) return t.authEmailTaken;
   if (error.status === 0 || error instanceof TypeError) return t.authNetworkError;
-  return error.message || t.authGenericError;
+  return t.authGenericError;
 };
 
 export default function RegisterPage({ t, lang, setLang, isDarkMode, setIsDarkMode, onAuthenticated, navigate }) {

@@ -208,7 +208,7 @@ export default function CompoundInterestPage({
               <div className="flex justify-between text-slate-400">
                 <span>{t.rendaMensalEstimada}:</span>
                 <span className="font-bold" style={{ color: palette.rendaMensal }}>
-                  {formatMoney(jcResult.rendaMensalFinal)}/mês
+                  {formatMoney(jcResult.rendaMensalFinal)}{t.perMonthSuffix}
                 </span>
               </div>
             </div>
@@ -359,7 +359,7 @@ export default function CompoundInterestPage({
                     {formatMoney(row.patrimonio)}
                   </td>
                   <td className="p-3.5 font-bold" style={{ color: palette.rendaMensal }}>
-                    {formatMoney(row.rendaMensal)}/mês
+                    {formatMoney(row.rendaMensal)}{t.perMonthSuffix}
                   </td>
                 </tr>
               ))}

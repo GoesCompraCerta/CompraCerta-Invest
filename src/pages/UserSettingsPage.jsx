@@ -89,7 +89,7 @@ export default function UserSettingsPage({
       await deleteAccount(password);
       await onAccountDeleted();
     } catch (error) {
-      setDeleteAccountError(error.status === 401 ? error.message : t.deleteAccountError);
+      setDeleteAccountError(t.deleteAccountError);
     } finally {
       setIsDeletingAccount(false);
     }

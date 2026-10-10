@@ -10,7 +10,7 @@ const EMPTY_RATES = {
 let cachedRates = null;
 let cacheTimestamp = 0;
 
-const formatCurrency = (value) => Number(value || 0).toLocaleString('pt-BR', {
+const formatCurrency = (value, locale) => Number(value || 0).toLocaleString(locale, {
   style: 'currency',
   currency: 'BRL'
 });
@@ -20,7 +20,7 @@ const formatChange = (value) => {
   return `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
 };
 
-export default function CurrencyWidget() {
+export default function CurrencyWidget({ t, lang }) {
   const [rates, setRates] = useState(cachedRates || EMPTY_RATES);
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState('');
@@ -56,18 +56,18 @@ export default function CurrencyWidget() {
       cachedRates = nextRates;
       cacheTimestamp = now;
       setRates(nextRates);
-      setLastUpdate(new Date().toLocaleTimeString('pt-BR', {
+      setLastUpdate(new Date().toLocaleTimeString(lang === 'en' ? 'en-US' : 'pt-BR', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
       }));
     } catch (requestError) {
       console.error('Exchange rate lookup failed:', requestError);
-      setError('Câmbio indisponível');
+      setError(t.exchangeUnavailable);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [lang, t]);
 
   useEffect(() => {
     fetchExchangeRates();
@@ -80,15 +80,15 @@ export default function CurrencyWidget() {
           <span className="flex h-5 w-5 items-center justify-center rounded-full border border-emerald-700/80 bg-emerald-950 text-[11px] font-extrabold text-emerald-400 shadow-sm">
             <DollarSign className="h-3 w-3 stroke-[3]" />
           </span>
-          CÂMBIO INTERNACIONAL
+          {t.exchangeWidgetTitle}
         </span>
         <button
           type="button"
           onClick={() => fetchExchangeRates(true)}
           disabled={loading}
           className="cursor-pointer p-1 text-xs text-slate-400 transition-colors hover:text-white disabled:opacity-50"
-          title="Atualizar cotações"
-          aria-label="Atualizar cotações"
+          title={t.exchangeRefresh}
+          aria-label={t.exchangeRefresh}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -102,7 +102,7 @@ export default function CurrencyWidget() {
               <span className="text-white">/ BRL</span>
             </span>
             <span className="flex items-center gap-2.5">
-              <span className="text-sm font-semibold text-white">{formatCurrency(rates[currency].bid)}</span>
+              <span className="text-sm font-semibold text-white">{formatCurrency(rates[currency].bid, lang === 'en' ? 'en-US' : 'pt-BR')}</span>
               <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${rates[currency].pctChange >= 0 ? 'bg-emerald-950/40 text-emerald-400' : 'bg-rose-950/40 text-rose-400'}`}>
                 {formatChange(rates[currency].pctChange)}
               </span>
@@ -113,7 +113,7 @@ export default function CurrencyWidget() {
 
       {error && <div className="mt-2 text-[10px] text-rose-400">⚠️ {error}</div>}
       {lastUpdate && !error && (
-        <div className="mt-2 text-right text-[10px] font-medium text-slate-400">Atualizado às {lastUpdate}</div>
+        <div className="mt-2 text-right text-[10px] font-medium text-slate-400">{t.exchangeUpdatedAt.replace('{time}', lastUpdate)}</div>
       )}
     </div>
   );

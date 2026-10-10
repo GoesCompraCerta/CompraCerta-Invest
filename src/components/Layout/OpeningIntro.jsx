@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import introVideo from '../../../abertura do programa/1000131540.mp4';
 
-export default function OpeningIntro({ onFinish }) {
+export default function OpeningIntro({ onFinish, t }) {
   const videoRef = useRef(null);
   const transitionStartedRef = useRef(false);
   const pauseTimeoutRef = useRef(null);
@@ -72,7 +72,7 @@ export default function OpeningIntro({ onFinish }) {
         playsInline
         preload="auto"
         onEnded={handleVideoEnd}
-        aria-label="Abertura do Compra Certa Investe"
+        aria-label={t.openingVideoLabel}
       />
       <div className="absolute bottom-5 right-5 flex gap-2">
         <button
@@ -80,14 +80,14 @@ export default function OpeningIntro({ onFinish }) {
           onClick={handleSkip}
           className="rounded-md bg-black/60 px-4 py-2 text-sm text-white transition hover:bg-black/80"
         >
-          Pular abertura
+          {t.skipOpening}
         </button>
         <button
           type="button"
           onClick={handleAudioToggle}
           className="rounded-md bg-black/60 px-3 py-2 text-lg text-white transition hover:bg-black/80"
-          title={isMuted ? 'Ligar som' : 'Desligar som'}
-          aria-label={isMuted ? 'Ligar som' : 'Desligar som'}
+          title={isMuted ? t.turnSoundOn : t.turnSoundOff}
+          aria-label={isMuted ? t.turnSoundOn : t.turnSoundOff}
         >
           {isMuted ? '🔇' : '🎵'}
         </button>

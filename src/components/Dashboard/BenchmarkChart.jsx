@@ -143,7 +143,7 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
         })
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Erro ao carregar benchmark');
+      if (!response.ok) throw new Error(payload.error || t.benchmarkRequestError);
 
       setData(formatData(payload.serie));
       setWarning(Array.isArray(payload.avisos) ? payload.avisos.join(' ') : '');
@@ -158,9 +158,9 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
       } catch {
         // O gráfico continua utilizável mesmo quando o armazenamento está indisponível.
       }
-    } catch (requestError) {
+    } catch {
       setData([]);
-      setError(requestError?.message || 'Erro ao carregar benchmark');
+      setError('benchmarkRequestError');
       setStatus('error');
     }
   };
@@ -236,10 +236,10 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
           </button>
         </div>
       </div>
-      {status === 'loading' && <div className="flex h-[360px] items-center justify-center text-xs text-slate-400">Carregando...</div>}
-      {status === 'error' && <div className="flex h-[360px] items-center justify-center text-center text-xs text-rose-400">{error}</div>}
+      {status === 'loading' && <div className="flex h-[360px] items-center justify-center text-xs text-slate-400">{t.benchmarkChartLoading}</div>}
+      {status === 'error' && <div className="flex h-[360px] items-center justify-center text-center text-xs text-rose-400">{t[error] || error}</div>}
       {status === 'success' && warning && <p className="mb-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-400">{warning}</p>}
-      {status === 'success' && data.length === 0 && <div className="flex h-[360px] items-center justify-center text-xs text-slate-400">Cadastre ativos para ver a evolução.</div>}
+      {status === 'success' && data.length === 0 && <div className="flex h-[360px] items-center justify-center text-xs text-slate-400">{t.benchmarkChartNoAssets}</div>}
       {status === 'success' && data.length >= 2 && (
         <div className="h-[360px] w-full">
           <ResponsiveContainer width="100%" height="100%">

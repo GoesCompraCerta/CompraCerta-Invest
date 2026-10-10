@@ -42,7 +42,7 @@ export const useUpdateQuotes = () => {
         setUpdateMsg(`✓ ${asset.ticker} ${t.cotacaoAtualizada}`);
       } catch (err) {
         console.error('Update quotes error:', err);
-        setUpdateMsg(err?.message || t.erroCotacoes);
+        setUpdateMsg(t.erroCotacoes);
       } finally {
         setUpdatingAssetId(null);
         setTimeout(() => setUpdateMsg(''), 4000);

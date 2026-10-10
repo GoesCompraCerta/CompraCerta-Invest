@@ -117,13 +117,13 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
     <div key={field}>
       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">
         {field === 'qty' && cryptoAsset
-          ? 'Quantidade'
+          ? t.quantidade
           : field === 'pm' && cryptoAsset
-            ? 'Preço Médio (R$)'
+            ? `${t.precoMedio} (R$)`
             : field === 'pm' && internationalAsset
-              ? `Preço Médio (${averagePriceCurrency})`
+              ? `${t.precoMedio} (${averagePriceCurrency})`
               : field === 'price' && internationalAsset
-                ? `Cotação Atual (${currentPriceCurrency})`
+                ? `${t.precoAtual} (${currentPriceCurrency})`
                 : (t[labelKey] || labelKey)}
       </label>
       <input
@@ -140,7 +140,7 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
 
   const renderFiiRecurringYieldField = () => (
     <div key="dividendYieldRecorrente">
-      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">DY Recorrente (%)</label>
+      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">{t.dividendYieldRecorrente}</label>
       <input
         type="number"
         step="0.01"
@@ -158,7 +158,7 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
     return (
       <div key={field} className="flex flex-col gap-1 min-w-0 w-full">
         <div className="flex items-center justify-between gap-2 w-full min-w-0">
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide truncate">Dividendos</label>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide truncate">{t.dividendos}</label>
           <div className="flex items-center gap-1 rounded-md border border-slate-800 bg-slate-950 p-0.5 shrink-0 self-center -mt-1">
             {['12M', '24M'].map((period) => (
               <button
@@ -219,7 +219,7 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
         )}
         {COMMON_FIELDS.slice(0, 3).map(renderField)}
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Data da Compra</label>
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">{t.purchaseDate}</label>
           <input
             type="text"
             value={formData.buyDate ?? ''}

@@ -1,4 +1,5 @@
 import { calculateAssetInvested } from '../utils/assetValuation.js';
+import { ASSET_TYPE_TRANSLATION_KEYS, TRANSLATIONS } from '../constants/translations.js';
 
 // ── Calculate portfolio totals ───────────────────────────────────────────────
 export const calculatePortfolioTotals = (assets, proventos) => {
@@ -381,7 +382,7 @@ export const calculateFiiMethods = (asset) => {
 };
 
 // ── Export portfolio and proventos as one tax-focused Excel workbook ────────
-export const exportPortfolioToExcel = async (assets = [], proventos = []) => {
+export const exportPortfolioToExcel = async (assets = [], proventos = [], t = TRANSLATIONS.pt) => {
   const portfolioAssets = Array.isArray(assets) ? assets : [];
   const portfolioIncome = Array.isArray(proventos) ? proventos : [];
   if (portfolioAssets.length === 0 && portfolioIncome.length === 0) return;
@@ -419,24 +420,20 @@ export const exportPortfolioToExcel = async (assets = [], proventos = []) => {
     }
   };
 
-  const typeLabels = {
-    'Ação BR': 'Ação (B3)',
-    'Ações (B3)': 'Ação (B3)',
-    Acao: 'Ação (B3)',
-    FII: 'FII (B3)',
-    FIIs: 'FII (B3)',
-    'FIIs (B3)': 'FII (B3)',
-    'Fundo Imobiliário': 'FII (B3)',
-    Stocks: 'Ação (EUA)',
-    'Ações Internacionais': 'Ação (EUA)',
-    'Ações (EUA / Globais)': 'Ação (EUA)',
-    Internacional: 'Ação (EUA)',
-    REIT: 'REIT (EUA)',
-    REITs: 'REIT (EUA)',
-    'REITs (EUA / Globais)': 'REIT (EUA)',
-    Cripto: 'Cripto',
-    'Renda Fixa': 'Renda Fixa'
-  };
+  const getAssetTypeLabel = (asset) => t[ASSET_TYPE_TRANSLATION_KEYS[asset.type]] || asset.type || '';
+  const assetHeaders = [
+    t.exportTickerHeader,
+    t.exportTypeHeader,
+    t.exportQuantityHeader,
+    t.exportAveragePriceHeader,
+    t.exportTotalCostHeader,
+    t.exportCurrentQuoteHeader,
+    t.exportCurrentValueHeader,
+    t.exportProfitLossValueHeader,
+    t.exportProfitLossPercentHeader,
+    t.exportTargetHeader
+  ];
+  const incomeHeaders = [t.exportDateHeader, t.exportAssetHeader, t.exportTypeHeader, t.exportReceivedAmountHeader];
 
   const assetRows = portfolioAssets.map((asset) => {
     const quantity = Number(asset.qty) || 0;
@@ -448,7 +445,7 @@ export const exportPortfolioToExcel = async (assets = [], proventos = []) => {
     const profitPercent = costTotal > 0 ? (profit / costTotal) * 100 : 0;
     return [
       asset.ticker || '',
-      typeLabels[asset.type] || asset.type || '',
+      getAssetTypeLabel(asset),
       quantity,
       averagePrice,
       costTotal,
@@ -472,43 +469,50 @@ export const exportPortfolioToExcel = async (assets = [], proventos = []) => {
       return [
         parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : rawDate,
         String(income.ticker || income.ativo).toUpperCase(),
-        type.includes('jcp') || type.includes('juros') ? 'JCP' : 'Dividendos',
+        type.includes('jcp') || type.includes('juros') ? t.jcp : t.dividendos,
         Number(income.value ?? income.amount ?? income.valor) || 0
       ];
     });
 
   const complete = XLSX.utils.aoa_to_sheet([
-    ['ATIVOS / RESUMO DA CARTEIRA'],
-    ['Ativo / Ticker', 'Tipo', 'Quantidade', 'Preço Médio (R$)', 'Custo Total (R$)', 'Cotação Atual (R$)', 'Valor Total Atual (R$)', 'Lucro / Prejuízo (R$)', 'Lucro / Prejuízo (%)', 'Meta (%)'],
+    [t.exportPortfolioTitle],
+    assetHeaders,
     ...assetRows,
     [],
-    ['RENDIMENTOS E PROVENTOS'],
-    ['Data', 'Ativo', 'Tipo', 'Valor recebido (R$)'],
+    [t.exportIncomeTitle],
+    incomeHeaders,
     ...incomeRows
   ]);
   applySheetFormatting(complete, [18, 18, 14, 20, 20, 22, 24, 24, 22, 12], [3, 4, 5, 6, 7]);
-  XLSX.utils.book_append_sheet(workbook, complete, 'Resumo Completo');
+  XLSX.utils.book_append_sheet(workbook, complete, t.exportCompleteSheet);
 
   const summary = XLSX.utils.aoa_to_sheet([
-    ['Ativo / Ticker', 'Tipo', 'Quantidade', 'Preço Médio (R$)', 'Custo Total (R$)', 'Cotação Atual (R$)', 'Valor Total Atual (R$)', 'Lucro / Prejuízo (R$)', 'Lucro / Prejuízo (%)', 'Meta (%)'],
+    assetHeaders,
     ...assetRows
   ]);
   applySheetFormatting(summary, [18, 18, 14, 20, 20, 22, 24, 24, 22, 12], [3, 4, 5, 6, 7]);
-  XLSX.utils.book_append_sheet(workbook, summary, 'Ativos - Resumo');
+  XLSX.utils.book_append_sheet(workbook, summary, t.exportAssetsSheet);
 
   const bens = XLSX.utils.aoa_to_sheet([
-    ['Codigo / Ticker', 'Tipo de bem', 'Quantidade em 31/12', 'Custo medio de aquisicao (R$)', 'Custo de aquisicao (R$)', 'Descricao para Bens e Direitos'],
-    ...portfolioAssets.map((asset) => [asset.ticker || '', asset.type || '', Number(asset.qty) || 0, Number(asset.pm) || 0, (Number(asset.qty) || 0) * (Number(asset.pm) || 0), `${asset.qty} cotas de ${asset.ticker} (${asset.type}), adquiridas pelo custo total informado.`])
+    [t.exportTaxCodeHeader, t.exportTaxTypeHeader, t.exportTaxQuantityHeader, t.exportTaxAverageCostHeader, t.exportTaxCostHeader, t.exportTaxDescriptionHeader],
+    ...portfolioAssets.map((asset) => {
+      const type = getAssetTypeLabel(asset);
+      const description = t.exportTaxDescription
+        .replace('{quantity}', String(asset.qty))
+        .replace('{ticker}', asset.ticker || '')
+        .replace('{type}', type);
+      return [asset.ticker || '', type, Number(asset.qty) || 0, Number(asset.pm) || 0, (Number(asset.qty) || 0) * (Number(asset.pm) || 0), description];
+    })
   ]);
   applySheetFormatting(bens, [20, 18, 20, 30, 25, 72], [3, 4]);
-  XLSX.utils.book_append_sheet(workbook, bens, 'IR - Bens e Direitos');
+  XLSX.utils.book_append_sheet(workbook, bens, t.exportTaxSheet);
 
   const income = XLSX.utils.aoa_to_sheet([
-    ['Data', 'Ativo', 'Tipo', 'Valor recebido (R$)'],
+    incomeHeaders,
     ...incomeRows
   ]);
   applySheetFormatting(income, [14, 16, 18, 24], [3], [0]);
-  XLSX.utils.book_append_sheet(workbook, income, 'Rendimentos e Proventos');
+  XLSX.utils.book_append_sheet(workbook, income, t.exportIncomeSheet);
 
-  XLSX.writeFile(workbook, `carteira_ir_${new Date().getFullYear()}.xlsx`);
+  XLSX.writeFile(workbook, `${t.exportFilenamePrefix}_${new Date().getFullYear()}.xlsx`);
 };
