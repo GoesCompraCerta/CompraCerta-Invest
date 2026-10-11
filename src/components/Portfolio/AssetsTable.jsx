@@ -158,6 +158,7 @@ export default function AssetsTable({
   formatMoney,
   cardClass,
   t,
+  lang,
   onEdit,
   onDelete,
   onUpdateQuote,
@@ -313,7 +314,7 @@ export default function AssetsTable({
                                 >
                                   <div className="text-[10px] uppercase tracking-[0.12em] text-slate-500">{translateDetailMetric(label, t)}</div>
                                   <div className="mt-1 text-sm font-semibold text-slate-100 truncate">
-                                    {formatDetailValue(label, value)}
+                                    {formatDetailValue(label, value, t, lang)}
                                   </div>
                                 </div>
                               ))}
