@@ -9,6 +9,24 @@ const sqlitePath = resolve(serverDirectory, '..', 'data', 'app.db');
 
 export let db;
 
+const DB_INIT_MAX_ATTEMPTS = 5;
+const DB_INIT_RETRY_DELAY_MS = 1000;
+const TRANSIENT_DB_ERROR_CODES = new Set([
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EHOSTUNREACH',
+  'ECONNREFUSED',
+  'EPIPE',
+  'PROTOCOL_CONNECTION_LOST',
+  'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR',
+  'ER_SERVER_SHUTDOWN'
+]);
+
+const isTransientDbError = (error) =>
+  TRANSIENT_DB_ERROR_CODES.has(error?.code || error?.cause?.code);
+
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 const migrateSqliteData = async () => {
   const [migrations] = await db.execute(
     'SELECT name FROM schema_migrations WHERE name = ?',
@@ -89,21 +107,7 @@ const migrateSqliteData = async () => {
   }
 };
 
-export const initDb = async () => {
-  if (!db) {
-    db = mysql.createPool({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      dateStrings: true
-    });
-  }
-
+const initializeDatabase = async () => {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -157,6 +161,47 @@ export const initDb = async () => {
   `);
 
   await migrateSqliteData();
+};
+
+export const initDb = async () => {
+  if (!db) {
+    db = mysql.createPool({
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT || 3306),
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS) || 10000,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 0,
+      dateStrings: true
+    });
+
+    db.on('connection', (connection) => {
+      connection.on('error', (error) => {
+        console.error(`[db] Conexão MySQL interrompida (${error.code || error.message}).`);
+      });
+    });
+  }
+
+  for (let attempt = 1; attempt <= DB_INIT_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await initializeDatabase();
+      return;
+    } catch (error) {
+      if (!isTransientDbError(error) || attempt === DB_INIT_MAX_ATTEMPTS) {
+        console.error(`[db] Inicialização falhou na tentativa ${attempt}/${DB_INIT_MAX_ATTEMPTS}:`, error.message || error);
+        throw error;
+      }
+
+      const delay = DB_INIT_RETRY_DELAY_MS * (2 ** (attempt - 1));
+      console.warn(`[db] Erro transitório ${error.code}; nova tentativa em ${delay}ms (${attempt}/${DB_INIT_MAX_ATTEMPTS}).`);
+      await wait(delay);
+    }
+  }
 };
 
 export const getUserByEmail = async (email) => {

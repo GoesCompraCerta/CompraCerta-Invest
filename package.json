@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "set NODE_ENV=development&& set API_PORT=3001&& node server.mjs",
-    "start": "NODE_ENV=production node server.mjs",
+    "dev": "cross-env NODE_ENV=development API_PORT=3001 node server.mjs",
+    "start": "cross-env NODE_ENV=production node server.mjs",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
@@ -25,6 +25,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.22",
+    "cross-env": "^10.0.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "vite": "^5.4.1"
