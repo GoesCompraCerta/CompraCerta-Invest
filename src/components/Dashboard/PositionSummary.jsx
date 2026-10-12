@@ -45,42 +45,45 @@ export default function PositionSummary({
             return (
               <div
                 key={item.id}
-                className={`resumo-posicionamento-item item-ativo-resumo p-3 rounded-xl border flex items-center justify-between text-xs ${
+                className={`resumo-posicionamento-item item-ativo-resumo p-3 rounded-xl border text-xs ${
                   isDarkMode ? 'bg-slate-900/40 border-slate-800/60' : 'bg-white border-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
                   <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    className="mt-0.5 w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ background: getChartColor(idx, isDarkMode) }}
                   />
-                  <div className="min-w-0 flex-1">
-                    <div className={`font-bold ${textBase} whitespace-nowrap overflow-hidden text-ellipsis`}>
-                      <span className="inline-block max-w-[70%] align-bottom truncate">
-                        {item.ticker}
-                      </span>{' '}
-                      <span className={`text-[9px] font-normal ${mutedText} align-middle`}>
-                        ({t[ASSET_TYPE_TRANSLATION_KEYS[item.type]] || item.type})
-                      </span>
-                    </div>
-                    <div className={`text-[10px] ${mutedText}`}>
-                      {t.averagePriceShort} {formatMoney(item.pm)} | {t.currentPriceShort} {formatMoney(item.price)}
-                    </div>
-                    <div className={`text-[10px] font-medium ${lucroClass}`}>
-                      {lucroLabel} {formatMoney(lucro)}{' '}
-                      <span className="opacity-80">
-                        ({renderReturnPercent(rentabilidade)})
-                      </span>
-                    </div>
+
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className={`font-bold ${textBase} whitespace-nowrap`}>
+                      {item.ticker}
+                    </span>
+                    <span className={`text-[9px] font-normal ${mutedText} whitespace-nowrap`}>
+                      ({t[ASSET_TYPE_TRANSLATION_KEYS[item.type]] || item.type})
+                    </span>
+                  </div>
+
+                  <div className={`w-[110px] shrink-0 text-right font-bold ${textBase}`}>
+                    {formatMoney(item.valorTotal)}
                   </div>
                 </div>
 
-                <div className="text-right shrink-0 min-w-[110px]">
-                  <div className={`font-bold ${textBase} whitespace-nowrap`}>{formatMoney(item.valorTotal)}</div>
-                  <div className={`text-[10px] mt-1 ${mutedText}`}>
-                    <div>{renderAllocationPercent(pctCarteira)}</div>
-                    <div className="uppercase tracking-wide text-[9px]">% da carteira</div>
+                <div className="mt-1 flex min-w-0 items-center justify-between gap-2">
+                  <div className={`text-[10px] ${mutedText} whitespace-nowrap`}>
+                    {t.averagePriceShort} {formatMoney(item.pm)} | {t.currentPriceShort} {formatMoney(item.price)}
                   </div>
+                  <div className={`w-[110px] shrink-0 text-right text-[10px] ${mutedText}`}>
+                    {renderAllocationPercent(pctCarteira)}
+                  </div>
+                </div>
+
+                <div className={`mt-1 text-[10px] font-medium ${lucroClass} whitespace-nowrap`}>
+                  {lucroLabel} {formatMoney(lucro)} ({renderReturnPercent(rentabilidade)})
+                </div>
+
+                <div className={`mt-0.5 w-[110px] self-end text-right text-[9px] uppercase tracking-wide ${mutedText}`}>
+                  % da carteira
                 </div>
               </div>
             );
