@@ -12,6 +12,7 @@ export default function DashboardPage({
   lang,
   pieRadiusLevel,
   setPieRadiusLevel,
+  privacyMode,
   t
 }) {
   return (
@@ -32,6 +33,7 @@ export default function DashboardPage({
           isDarkMode={isDarkMode}
           cardClass={cardClass}
           lang={lang}
+          privacyMode={privacyMode}
           t={t}
         />
       </div>
