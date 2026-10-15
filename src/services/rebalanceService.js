@@ -1,9 +1,16 @@
+import { isCrypto } from '../utils/cryptoUtils.js';
+
 const toNumber = (value, fallback = 0) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 
-export const calculateStaticRebalance = ({ ativos = [], novoAporte = 0, patrimonioAtual = null }) => {
+export const calculateStaticRebalance = ({
+  ativos = [],
+  novoAporte = 0,
+  patrimonioAtual = null,
+  patrimonioFuturo: patrimonioFuturoInformado = null
+}) => {
   const aporte = toNumber(novoAporte, 0);
   const patrimonio =
     patrimonioAtual !== null && patrimonioAtual !== undefined
@@ -12,6 +19,9 @@ export const calculateStaticRebalance = ({ ativos = [], novoAporte = 0, patrimon
           const valorAtual = toNumber(asset.valorAtual ?? asset.valorTotal ?? 0, 0);
           return total + valorAtual;
         }, 0);
+  const patrimonioFuturo = patrimonioFuturoInformado !== null && patrimonioFuturoInformado !== undefined
+    ? toNumber(patrimonioFuturoInformado, patrimonio + aporte)
+    : patrimonio + aporte;
 
   if (!Array.isArray(ativos) || ativos.length === 0 || aporte <= 0) {
     return {
@@ -42,7 +52,7 @@ export const calculateStaticRebalance = ({ ativos = [], novoAporte = 0, patrimon
     const valorAtual = toNumber(asset.valorAtual ?? asset.valorTotal ?? 0, 0);
     const meta = toNumber(asset.meta ?? asset.metaPercent ?? 0, 0);
     const pctAtual = patrimonio > 0 ? (valorAtual / patrimonio) * 100 : 0;
-    const alvo = patrimonio * (meta / 100);
+    const alvo = patrimonioFuturo * (meta / 100);
     const deficit = Math.max(0, alvo - valorAtual);
     const metaAtingida = pctAtual >= meta;
 
@@ -79,11 +89,26 @@ export const calculateStaticRebalance = ({ ativos = [], novoAporte = 0, patrimon
       aporteSugerido = asset.deficit;
     }
 
+    const precoAtual = toNumber(asset.precoAtual ?? asset.price, 0);
+    let cotasSugeridas = 0;
+
+    if (precoAtual > 0) {
+      if (isCrypto(asset.type, asset.ticker)) {
+        cotasSugeridas = aporteSugerido / precoAtual;
+      } else {
+        const lote = Math.max(1, toNumber(asset.loteMinimo ?? asset.lote, 1));
+        cotasSugeridas = Math.floor(aporteSugerido / precoAtual / lote) * lote;
+        aporteSugerido = cotasSugeridas * precoAtual;
+      }
+    }
+
+    aporteSugerido = Number(aporteSugerido.toFixed(2));
     totalDistribuido += aporteSugerido;
 
     return {
       ...asset,
-      aporteSugerido: Number(aporteSugerido.toFixed(2))
+      aporteSugerido,
+      cotasSugeridas
     };
   });
 

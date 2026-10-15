@@ -308,6 +308,33 @@ addTest(
 );
 
 addTest(
+  'Rebalance: alvo usa patrimônio futuro e arredonda cotas no serviço',
+  {},
+  'IVVB11 abaixo da meta recebe aporte em cotas inteiras',
+  () => {
+    const result = calculateStaticRebalance({
+      ativos: [{
+        ticker: 'IVVB11',
+        type: 'Ações',
+        valorAtual: 880.321,
+        precoAtual: 400,
+        meta: 15
+      }],
+      novoAporte: 50006,
+      patrimonioAtual: 6771.7,
+      patrimonioFuturo: 56777.7
+    });
+    const ivvb = result.distribuicao[0];
+
+    return ivvb.metaAtingida === false
+      && approximately(ivvb.alvo, 8516.655)
+      && ivvb.aporteSugerido === 7600
+      && ivvb.cotasSugeridas === 19
+      && result.totalDistribuido + result.caixaRestante === 50006;
+  }
+);
+
+addTest(
   'Rebalance static: ativos acima da meta recebem zero',
   {
     ativos: [
@@ -423,8 +450,9 @@ addTest(
   'Rebalance static: ativos tradicionais arredondam para cotas inteiras e respeitam valor financeiro',
   {
     ativos: [
-      { id: 'A', ticker: 'PETR4', type: 'Ações', meta: 50, valorAtual: 400 },
-      { id: 'B', ticker: 'BTC', type: 'Cripto', meta: 50, valorAtual: 0 }
+      { id: 'A', ticker: 'PETR4', type: 'Ações', meta: 40, valorAtual: 100, precoAtual: 10 },
+      { id: 'B', ticker: 'BTC', type: 'Cripto', meta: 40, valorAtual: 100, precoAtual: 75 },
+      { id: 'C', ticker: 'CASH', type: 'Ações', meta: 20, valorAtual: 200 }
     ],
     novoAporte: 500,
     patrimonioAtual: 400
@@ -433,11 +461,13 @@ addTest(
   () => {
     const result = calculateStaticRebalance({
       ativos: [
-        { id: 'A', ticker: 'PETR4', type: 'Ações', meta: 50, valorAtual: 400 },
-        { id: 'B', ticker: 'BTC', type: 'Cripto', meta: 50, valorAtual: 0 }
+        { id: 'A', ticker: 'PETR4', type: 'Ações', meta: 40, valorAtual: 100, precoAtual: 10 },
+        { id: 'B', ticker: 'BTC', type: 'Cripto', meta: 40, valorAtual: 100, precoAtual: 75 },
+        { id: 'C', ticker: 'CASH', type: 'Ações', meta: 20, valorAtual: 200 }
       ],
       novoAporte: 500,
-      patrimonioAtual: 400
+      patrimonioAtual: 400,
+      patrimonioFuturo: 900
     });
 
     const acao = result.distribuicao.find((item) => item.id === 'A');

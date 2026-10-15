@@ -24,25 +24,6 @@ const getAssetValue = (asset) => {
 
 const getAssetPrice = (asset) => Number(asset.precoAtual ?? asset.price ?? 0) || 0;
 const getAssetTarget = (asset) => Number(asset.meta ?? asset.metaPercent ?? 0) || 0;
-const isTraditionalAsset = (asset) => !isCrypto(asset.type, asset.ticker);
-const calculateSuggestedQuantity = (asset, value) => {
-  const price = getAssetPrice(asset);
-  if (value <= 0 || price <= 0) return { quantity: 0, value: 0 };
-
-  if (!isTraditionalAsset(asset)) {
-    return { quantity: value / price, value };
-  }
-
-  const lote = Number(asset.loteMinimo ?? asset.lote ?? 1) || 1;
-  const rawQuantity = value / price;
-  const adjustedQuantity = lote > 1 ? Math.floor(rawQuantity / lote) * lote : Math.floor(rawQuantity);
-  const roundedValue = adjustedQuantity * price;
-
-  return {
-    quantity: adjustedQuantity,
-    value: roundedValue
-  };
-};
 const formatSuggestedQuantity = (value) => {
   if (!Number.isFinite(value)) return '0';
   if (Number.isInteger(value)) return String(value);
@@ -97,24 +78,32 @@ export default function RebalancerPage({
         meta: getAssetTarget(asset)
       })),
       novoAporte: aporte,
-      patrimonioAtual: patrimonioTotal
+      patrimonioAtual: patrimonioTotal,
+      patrimonioFuturo
     });
 
     const items = base.distribuicao.map((item, index) => {
-      const ajustes = calculateSuggestedQuantity(item, item.aporteSugerido || 0);
-      const isCryptoAsset = !isTraditionalAsset(item);
+      const status = item.metaAtingida ? t.metaAtingida : t.comprar;
+      console.log('[rebalance]', {
+        ticker: item.ticker,
+        valorAtual: Number(item.valorAtual || 0),
+        alvo: item.alvo,
+        deficit: item.deficit,
+        aporteSugerido: item.aporteSugerido,
+        status
+      });
 
       return {
         ...item,
         index,
         valAtual: Number(item.valorAtual || 0),
-        aporteSugerido: isCryptoAsset ? Number(item.aporteSugerido || 0) : Number(ajustes.value || 0),
-        cotasSugeridas: Number(ajustes.quantity || 0)
+        aporteSugerido: Number(item.aporteSugerido || 0),
+        cotasSugeridas: Number(item.cotasSugeridas || 0)
       };
     });
 
-    const totalAlocado = items.reduce((total, item) => total + (Number(item.aporteSugerido) || 0), 0);
-    const sobraCaixa = Math.max(0, Number(aporte) - totalAlocado);
+    const totalAlocado = base.totalDistribuido;
+    const sobraCaixa = base.caixaRestante;
 
     return {
       items,
