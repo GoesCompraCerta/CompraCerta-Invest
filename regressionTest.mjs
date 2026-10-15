@@ -308,29 +308,94 @@ addTest(
 );
 
 addTest(
-  'Rebalance: alvo usa patrimônio futuro e arredonda cotas no serviço',
+  'Rebalance: alvo usa patrimônio atual e arredonda cotas no serviço',
   {},
-  'IVVB11 abaixo da meta recebe aporte em cotas inteiras',
+  'IVVB11 usa o alvo atual; déficit menor que uma cota fica no caixa',
   () => {
     const result = calculateStaticRebalance({
       ativos: [{
         ticker: 'IVVB11',
         type: 'Ações',
-        valorAtual: 880.321,
-        precoAtual: 400,
+        valorAtual: 878.50,
+        precoAtual: 439.25,
         meta: 15
       }],
       novoAporte: 50006,
-      patrimonioAtual: 6771.7,
+      patrimonioAtual: 6771.70,
       patrimonioFuturo: 56777.7
     });
     const ivvb = result.distribuicao[0];
 
     return ivvb.metaAtingida === false
-      && approximately(ivvb.alvo, 8516.655)
-      && ivvb.aporteSugerido === 7600
-      && ivvb.cotasSugeridas === 19
-      && result.totalDistribuido + result.caixaRestante === 50006;
+      && approximately(ivvb.alvo, 1015.76)
+      && approximately(ivvb.deficit, 137.26)
+      && ivvb.aporteSugerido === 0
+      && ivvb.cotasSugeridas === 0
+      && result.totalDistribuido === 0
+      && result.caixaRestante === 50006;
+  }
+);
+
+addTest(
+  'Rebalance: tolerância e cotas inteiras mantêm o caixa nos três aportes',
+  {},
+  'meta atingida não recebe aporte e IVVB11 não compra cota com déficit de R$ 137,26',
+  () => {
+    const patrimonioAtual = 6771.70;
+    const ativos = [
+      { ticker: 'IVVB11', type: 'Ações', valorAtual: 878.50, precoAtual: 439.25, meta: 15 },
+      { ticker: 'RBRR11', type: 'FII', valorAtual: 676.80, precoAtual: 75.20, meta: 10 },
+      { ticker: 'BBSE3', type: 'Ações', valorAtual: 819.38, precoAtual: 40.82, meta: 10 },
+      { ticker: 'M.PAGO', type: 'Ações', valorAtual: 4401.61, precoAtual: 4400, meta: 30 }
+    ];
+    const cenarios = [1000, 50006, 1000000000];
+
+    return cenarios.every((novoAporte) => {
+      const result = calculateStaticRebalance({
+        ativos,
+        novoAporte,
+        patrimonioAtual,
+        patrimonioFuturo: patrimonioAtual + novoAporte
+      });
+      const [ivvb, rbrr, bbse, mpago] = result.distribuicao;
+
+      return approximately(ivvb.deficit, 137.26)
+        && ivvb.metaAtingida === false
+        && ivvb.aporteSugerido === 0
+        && [rbrr, bbse, mpago].every((asset) => (
+          asset.metaAtingida && asset.aporteSugerido === 0
+        ))
+        && result.totalDistribuido === 0
+        && result.caixaRestante === novoAporte
+        && result.totalDistribuido <= novoAporte
+        && result.caixaRestante >= 0;
+    });
+  }
+);
+
+addTest(
+  'Rebalance: ativo abaixo da tolerância recebe o déficit em cotas inteiras',
+  {},
+  'ativo a 9,8% com meta de 10% recebe duas cotas de R$ 10,00',
+  () => {
+    const result = calculateStaticRebalance({
+      ativos: [{
+        ticker: 'TESTE',
+        type: 'Ações',
+        valorAtual: 980,
+        precoAtual: 10,
+        meta: 10
+      }],
+      novoAporte: 20,
+      patrimonioAtual: 10000
+    });
+    const asset = result.distribuicao[0];
+
+    return asset.metaAtingida === false
+      && asset.deficit === 20
+      && asset.aporteSugerido === 20
+      && asset.cotasSugeridas === 2
+      && result.caixaRestante === 0;
   }
 );
 
@@ -339,7 +404,7 @@ addTest(
   {
     ativos: [
       { id: 'A', ticker: 'A', meta: 15, valorAtual: 5000 },
-      { id: 'B', ticker: 'B', meta: 85, valorAtual: 3000 }
+      { id: 'B', ticker: 'B', meta: 85, valorAtual: 3000, precoAtual: 100 }
     ],
     novoAporte: 5000,
     patrimonioAtual: 10000
@@ -349,7 +414,7 @@ addTest(
     const result = calculateStaticRebalance({
       ativos: [
         { id: 'A', ticker: 'A', meta: 15, valorAtual: 5000 },
-        { id: 'B', ticker: 'B', meta: 85, valorAtual: 3000 }
+        { id: 'B', ticker: 'B', meta: 85, valorAtual: 3000, precoAtual: 100 }
       ],
       novoAporte: 5000,
       patrimonioAtual: 10000

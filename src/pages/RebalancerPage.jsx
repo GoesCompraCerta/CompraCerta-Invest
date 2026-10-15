@@ -47,30 +47,10 @@ export default function RebalancerPage({
 
   const assets = storedAssets.length > 0 ? storedAssets : (totals.list || []);
   const aporte = Number(novoAporte) || 0;
-  const aporteValido = Number.isFinite(aporte) && aporte > 0;
   const patrimonioTotal = assets.reduce((total, asset) => total + getAssetValue(asset), 0);
-  const patrimonioFuturo = aporteValido ? patrimonioTotal + aporte : 0;
+  const patrimonioFuturo = patrimonioTotal + aporte;
 
   const resultadoAporte = useMemo(() => {
-    if (!aporteValido) {
-      const items = assets.map((asset, index) => ({
-        ...asset,
-        index,
-        valAtual: getAssetValue(asset),
-        meta: getAssetTarget(asset),
-        pctAtual: patrimonioTotal > 0 ? ((getAssetValue(asset) / patrimonioTotal) * 100) : 0,
-        metaAtingida: patrimonioTotal > 0 ? ((getAssetValue(asset) / patrimonioTotal) * 100) >= getAssetTarget(asset) : false,
-        aporteSugerido: 0,
-        cotasSugeridas: 0
-      }));
-
-      return {
-        items,
-        totalAlocado: 0,
-        sobraCaixa: 0
-      };
-    }
-
     const base = calculateStaticRebalance({
       ativos: assets.map((asset) => ({
         ...asset,
@@ -78,8 +58,7 @@ export default function RebalancerPage({
         meta: getAssetTarget(asset)
       })),
       novoAporte: aporte,
-      patrimonioAtual: patrimonioTotal,
-      patrimonioFuturo
+      patrimonioAtual: patrimonioTotal
     });
 
     const items = base.distribuicao.map((item, index) => {
@@ -110,7 +89,7 @@ export default function RebalancerPage({
       totalAlocado,
       sobraCaixa
     };
-  }, [assets, aporte, aporteValido, patrimonioTotal]);
+  }, [assets, aporte, patrimonioTotal, t]);
 
   const formatarMoeda = (value) => oculto
     ? 'R$ ••••••'
@@ -172,9 +151,9 @@ export default function RebalancerPage({
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {resultadoAporte.items.length > 0 ? resultadoAporte.items.map((item, index) => {
-              const percentual = patrimonioTotal > 0 ? (item.valAtual / patrimonioTotal) * 100 : 0;
+              const percentual = item.pctAtual;
               const atingiuMeta = Boolean(item.metaAtingida);
-              const aporteExibido = atingiuMeta ? 0 : item.aporteSugerido;
+              const aporteExibido = item.aporteSugerido;
               const label = atingiuMeta ? t.metaAtingida : t.comprar;
               const aporteFormatado = oculto
                 ? (atingiuMeta ? 'R$ ••••••' : '+ R$ ••••••')
@@ -194,7 +173,7 @@ export default function RebalancerPage({
                       <span className="ml-1 text-slate-400">
                         {isCrypto(item.type, item.ticker)
                           ? `(${formatSuggestedQuantity(item.cotasSugeridas)} ${item.ticker})`
-                          : `(${item.cotasSugeridas} lote(s))`}
+                          : `(${item.cotasSugeridas} cota(s))`}
                       </span>
                     )}
                   </td>
