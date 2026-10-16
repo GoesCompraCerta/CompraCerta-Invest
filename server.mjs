@@ -1352,37 +1352,6 @@ const handleCoinGeckoRequest = async (request, response) => {
     sendJson(response, 502, { error: lastError?.message || 'Falha ao consultar a AwesomeAPI.' });
   };
 
-  const handleDbDiagnostic = async (_request, response) => {
-    const diagnostic = {
-      conectado: false,
-      erro: null,
-      users: null,
-      assets: null,
-      versao_mysql: null,
-      host: process.env.DB_HOST || null,
-      porta: String(process.env.DB_PORT || 3306),
-      database: process.env.DB_NAME || null
-    };
-    let connection;
-
-    try {
-      connection = await db.getConnection();
-      const [[usersRow]] = await connection.execute('SELECT COUNT(*) AS total FROM users');
-      const [[assetsRow]] = await connection.execute('SELECT COUNT(*) AS total FROM assets');
-      const [[versionRow]] = await connection.execute('SELECT VERSION() AS version');
-      diagnostic.conectado = true;
-      diagnostic.users = Number(usersRow.total);
-      diagnostic.assets = Number(assetsRow.total);
-      diagnostic.versao_mysql = versionRow.version;
-    } catch (error) {
-      diagnostic.erro = error?.message || String(error);
-    } finally {
-      connection?.release();
-    }
-
-    sendJson(response, diagnostic.conectado ? 200 : 503, diagnostic);
-  };
-
   const server = createServer((request, response) => {
   if (isProduction && !request.url?.startsWith('/api')) {
     serveProductionFile(request, response);
@@ -1497,11 +1466,6 @@ const handleCoinGeckoRequest = async (request, response) => {
 
   if (request.method === 'GET' && request.url === '/api/health') {
     sendJson(response, 200, { ok: true });
-    return;
-  }
-
-  if (request.method === 'GET' && request.url === '/api/debug/db') {
-    handleDbDiagnostic(request, response);
     return;
   }
 
