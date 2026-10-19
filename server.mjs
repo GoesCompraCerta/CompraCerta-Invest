@@ -872,31 +872,28 @@ const fetchBcbChunk = async (series, start, end) => {
   targetUrl.searchParams.set('dataInicial', start);
   targetUrl.searchParams.set('dataFinal', end);
 
-  let lastError;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const upstream = await fetch(targetUrl, {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(10_000)
-      });
-
-      if (!upstream.ok) {
-        throw new Error(`Banco Central respondeu HTTP ${upstream.status}`);
-      }
-
-      const payload = await upstream.json();
-      if (!Array.isArray(payload)) {
-        throw new Error('Banco Central retornou JSON inválido');
-      }
-
-      return payload;
-    } catch (error) {
-      lastError = error;
-      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 1000));
+  try {
+    const upstream = await fetch(targetUrl, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!upstream.ok) {
+      const error = new Error(`Banco Central respondeu HTTP ${upstream.status}`);
+      error.status = upstream.status;
+      throw error;
     }
-  }
 
-  throw lastError || new Error('Não foi possível consultar o Banco Central.');
+    const payload = await upstream.json();
+    if (!Array.isArray(payload)) {
+      throw new Error('Banco Central retornou JSON inválido');
+    }
+    return payload;
+  } catch (error) {
+    const status = error.status
+      || (error.name === 'TimeoutError' || error.name === 'AbortError' ? 'TIMEOUT' : 'SEM_STATUS');
+    console.error(`Erro na API externa: ${status} ${error.message || 'Falha na requisição ao Banco Central.'}`);
+    throw error;
+  }
 };
 
 const fetchBcbSeries = async (series, startDate, endDate) => {
@@ -1207,7 +1204,7 @@ const handlePortfolioEvolution = async (request, response) => {
   const startIso = start.toISOString().slice(0, 10);
   const endIso = end.toISOString().slice(0, 10);
 
-  const fetchMacro = async (series, label) => {
+  const fetchMacro = async (series) => {
     try {
       return await fetchBcbSeries(series, start, now);
     } catch {
@@ -1216,20 +1213,34 @@ const handlePortfolioEvolution = async (request, response) => {
   };
 
   const [cdiItems, poupancaItems, ipcaItems, ibovespaQuotes] = await Promise.all([
-    fetchMacro('12', 'CDI'),
-    fetchMacro('196', 'Poupança'),
-    fetchMacro('433', 'IPCA'),
+    fetchMacro('12'),
+    fetchMacro('196'),
+    fetchMacro('433'),
     fetchYahooMonthlyQuotes('^BVSP', startIso, endIso).catch(() => null)
   ]);
-  const cdi = cdiItems
-    ? rebaseSeriesToFirstPoint(accumulateMonthlyRates(parseBcbMonthlyRates(cdiItems, true), months), months)
-    : new Map();
-  const poupanca = poupancaItems
-    ? rebaseSeriesToFirstPoint(accumulateMonthlyRates(parseBcbMonthlyRates(poupancaItems), months), months)
-    : new Map();
-  const ipca = ipcaItems
-    ? rebaseSeriesToFirstPoint(accumulateMonthlyRates(parseBcbMonthlyRates(ipcaItems), months), months)
-    : new Map();
+  const emergencySeries = (annualRate) => new Map(months.map(({ key }, index) => [
+    key,
+    round((Math.pow(1 + annualRate / 100, index / 12) - 1) * 100)
+  ]));
+  const buildBenchmarkSeries = (items, daily, annualRate) => {
+    const calculated = items?.length
+      ? rebaseSeriesToFirstPoint(
+        accumulateMonthlyRates(parseBcbMonthlyRates(items, daily), months),
+        months
+      )
+      : new Map();
+    const hasData = [...calculated.values()].some(Number.isFinite);
+    return {
+      values: hasData ? calculated : emergencySeries(annualRate),
+      estimated: !hasData
+    };
+  };
+  const cdiData = buildBenchmarkSeries(cdiItems, true, 10.65);
+  const poupancaData = buildBenchmarkSeries(poupancaItems, false, 6.17);
+  const ipcaData = buildBenchmarkSeries(ipcaItems, false, 4.5);
+  const cdi = cdiData.values;
+  const poupanca = poupancaData.values;
+  const ipca = ipcaData.values;
   const ibovespa = ibovespaQuotes ? buildYahooAccumulatedSeries(ibovespaQuotes, months) : new Map();
 
   const series = months.map((month) => {
@@ -1269,7 +1280,9 @@ const handlePortfolioEvolution = async (request, response) => {
   const result = {
     periodo: { inicio: startIso, fim: endIso },
     serie: series,
-    avisos: []
+    avisos: cdiData.estimated || poupancaData.estimated || ipcaData.estimated
+      ? ['Estimativa']
+      : []
   };
 
   sendJson(response, 200, result);
@@ -1461,39 +1474,36 @@ const handleCoinGeckoRequest = async (request, response) => {
       return;
     }
 
-    let lastError;
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      try {
-        const upstream = await fetch(
-          'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,GBP-BRL,CAD-BRL',
-          {
-            headers: { Accept: 'application/json' },
-            signal: AbortSignal.timeout(10_000)
-          }
-        );
-        if (!upstream.ok) {
-          throw new Error(`AwesomeAPI respondeu HTTP ${upstream.status}.`);
+    try {
+      const upstream = await fetch(
+        'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,GBP-BRL,CAD-BRL',
+        {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(10_000)
         }
-
-        const rates = await upstream.json();
-        if (!rates?.USDBRL || !rates?.EURBRL) {
-          throw new Error('AwesomeAPI retornou dados de câmbio inválidos.');
-        }
-
-        try {
-          await setMarketCache(cacheKey, rates);
-        } catch (error) {
-          console.warn('[market-cache] Não foi possível salvar o cache de câmbio:', error.message);
-        }
-        sendJson(response, 200, rates);
-        return;
-      } catch (error) {
-        lastError = error;
-        console.error(`[exchange-rates] Tentativa ${attempt}/3 falhou:`, error.message || error);
-        if (attempt < 3) {
-          await new Promise((resolve) => setTimeout(resolve, 2_000));
-        }
+      );
+      if (!upstream.ok) {
+        const error = new Error(`AwesomeAPI respondeu HTTP ${upstream.status}.`);
+        error.status = upstream.status;
+        throw error;
       }
+
+      const rates = await upstream.json();
+      if (!rates?.USDBRL || !rates?.EURBRL) {
+        throw new Error('AwesomeAPI retornou dados de câmbio inválidos.');
+      }
+
+      try {
+        await setMarketCache(cacheKey, rates);
+      } catch (error) {
+        console.warn('[market-cache] Não foi possível salvar o cache de câmbio:', error.message);
+      }
+      sendJson(response, 200, rates);
+      return;
+    } catch (error) {
+      const status = error.status
+        || (error.name === 'TimeoutError' || error.name === 'AbortError' ? 'TIMEOUT' : 'SEM_STATUS');
+      console.error(`Erro na API externa: ${status} ${error.message || 'Falha na requisição de câmbio.'}`);
     }
 
     if (cachedEntry) {
@@ -1502,7 +1512,10 @@ const handleCoinGeckoRequest = async (request, response) => {
       return;
     }
 
-    sendJson(response, 502, { error: lastError?.message || 'Falha ao consultar a AwesomeAPI.' });
+    sendJson(response, 200, {
+      USDBRL: { bid: '5.50', pctChange: '0.00' },
+      _fallback: true
+    });
   };
 
   const server = createServer((request, response) => {

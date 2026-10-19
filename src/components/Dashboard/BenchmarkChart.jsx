@@ -238,7 +238,13 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
       </div>
       {status === 'loading' && <div className="flex h-[360px] items-center justify-center text-xs text-slate-400">{t.benchmarkChartLoading}</div>}
       {status === 'error' && <div className="flex h-[360px] items-center justify-center text-center text-xs text-rose-400">{t[error] || error}</div>}
-      {status === 'success' && warning && <p className="mb-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-400">{warning}</p>}
+      {status === 'success' && warning && (
+        <div className="mb-3">
+          <span className="inline-flex rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
+            {warning}
+          </span>
+        </div>
+      )}
       {status === 'success' && data.length === 0 && <div className="flex h-[360px] items-center justify-center text-xs text-slate-400">{t.benchmarkChartNoAssets}</div>}
       {status === 'success' && data.length >= 2 && (
         <div className="h-[360px] w-full">

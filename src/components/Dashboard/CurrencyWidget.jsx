@@ -9,6 +9,7 @@ const EMPTY_RATES = {
 
 let cachedRates = null;
 let cacheTimestamp = 0;
+let cachedRatesEstimated = false;
 
 const formatCurrency = (value, locale) => Number(value || 0).toLocaleString(locale, {
   style: 'currency',
@@ -25,12 +26,14 @@ export default function CurrencyWidget({ t, lang }) {
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState('');
   const [error, setError] = useState('');
+  const [isEstimated, setIsEstimated] = useState(cachedRatesEstimated);
 
   const fetchExchangeRates = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
 
     if (!forceRefresh && cachedRates && now - cacheTimestamp < CACHE_DURATION) {
       setRates(cachedRates);
+      setIsEstimated(cachedRatesEstimated);
       return;
     }
 
@@ -54,8 +57,10 @@ export default function CurrencyWidget({ t, lang }) {
       };
 
       cachedRates = nextRates;
+      cachedRatesEstimated = Boolean(data._fallback);
       cacheTimestamp = now;
       setRates(nextRates);
+      setIsEstimated(cachedRatesEstimated);
       setLastUpdate(new Date().toLocaleTimeString(lang === 'en' ? 'en-US' : 'pt-BR', {
         hour: '2-digit',
         minute: '2-digit',
@@ -81,6 +86,11 @@ export default function CurrencyWidget({ t, lang }) {
             <DollarSign className="h-3 w-3 stroke-[3]" />
           </span>
           {t.exchangeWidgetTitle}
+          {isEstimated && (
+            <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-400">
+              {lang === 'en' ? 'Estimate' : 'Estimativa'}
+            </span>
+          )}
         </span>
         <button
           type="button"
@@ -95,7 +105,7 @@ export default function CurrencyWidget({ t, lang }) {
       </div>
 
       <div className="space-y-1.5">
-        {['USD', 'EUR'].map((currency) => (
+        {(isEstimated ? ['USD'] : ['USD', 'EUR']).map((currency) => (
           <div key={currency} className="flex items-center justify-between gap-2 text-xs">
             <span className="font-bold tracking-wide">
               <span className={currency === 'USD' ? 'text-emerald-400' : 'text-sky-400'}>{currency}</span>{' '}
