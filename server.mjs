@@ -9,18 +9,23 @@ import YahooFinance from 'yahoo-finance2';
 import {
   activateUserPlanFromWebhook,
   createAsset,
+  createProvento,
   createPasswordReset,
   createUser,
   db,
   deleteAssetById,
+  deleteProventoById,
   deleteUserAndAssets,
   getAssetById,
   getAssetsByUserId,
+  getProventoById,
+  getProventosByUserId,
   getUserByEmail,
   getUserById,
   initDb,
   resetPasswordWithToken,
   updateAssetById,
+  updateProventoById,
   updateUserPlan
 } from './server/db.js';
 import { assertJwtSecret, generateToken, hashPassword, requireAuth, verifyPassword } from './server/auth.js';
@@ -707,6 +712,83 @@ const handleDeleteAsset = async (request, response, assetId) => {
   sendJson(response, 200, { success: true });
 };
 
+const toPublicProvento = (provento) => ({
+  id: provento.id,
+  ticker: provento.ticker,
+  value: Number(provento.valor),
+  type: provento.tipo,
+  date: String(provento.data).slice(0, 10)
+});
+
+const readAndValidateProvento = async (request, response) => {
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return null;
+  }
+
+  const ticker = typeof payload?.ticker === 'string' ? payload.ticker.trim().toUpperCase() : '';
+  const type = typeof payload?.type === 'string' ? payload.type.trim() : '';
+  const value = Number(payload?.value);
+  const date = payload?.date;
+
+  if (!ticker || ticker.length > 32 || !type || type.length > 64
+    || payload?.value === '' || payload?.value == null
+    || !Number.isFinite(value) || value <= 0
+    || !isValidIsoDate(date)) {
+    sendJson(response, 400, { error: 'Informe ticker, tipo, valor positivo e data YYYY-MM-DD válidos.' });
+    return null;
+  }
+
+  return { ticker, type, value, date };
+};
+
+const handleListProventos = async (request, response) => {
+  const userId = await requireActivePlan(request, response);
+  if (!userId) return;
+  sendJson(response, 200, (await getProventosByUserId(userId)).map(toPublicProvento));
+};
+
+const handleCreateProvento = async (request, response) => {
+  const userId = await requireActivePlan(request, response);
+  if (!userId) return;
+  const proventoData = await readAndValidateProvento(request, response);
+  if (!proventoData) return;
+
+  const provento = await createProvento({ userId, ...proventoData });
+  sendJson(response, 201, toPublicProvento(provento));
+};
+
+const handleUpdateProvento = async (request, response, proventoId) => {
+  const userId = await requireActivePlan(request, response);
+  if (!userId) return;
+  const proventoData = await readAndValidateProvento(request, response);
+  if (!proventoData) return;
+
+  const existing = await getProventoById(proventoId, userId);
+  if (!existing) {
+    sendJson(response, 404, { error: 'Provento não encontrado.' });
+    return;
+  }
+
+  const updated = await updateProventoById(proventoId, userId, proventoData);
+  sendJson(response, 200, toPublicProvento(updated));
+};
+
+const handleDeleteProvento = async (request, response, proventoId) => {
+  const userId = await requireActivePlan(request, response);
+  if (!userId) return;
+
+  const deleted = await deleteProventoById(proventoId, userId);
+  if (!deleted) {
+    sendJson(response, 404, { error: 'Provento não encontrado.' });
+    return;
+  }
+  sendJson(response, 200, { success: true });
+};
+
 const parseDate = (value) => {
   if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value || '')) return null;
   const [day, month, year] = value.split('/').map(Number);
@@ -1386,6 +1468,16 @@ const handleCoinGeckoRequest = async (request, response) => {
     return;
   }
 
+  if (request.method === 'GET' && request.url === '/api/proventos') {
+    handleListProventos(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && request.url === '/api/proventos') {
+    handleCreateProvento(request, response);
+    return;
+  }
+
   if (request.method === 'POST' && request.url?.split('?')[0] === '/api/webhook/mercadopago') {
     handleMercadoPagoWebhook(request, response);
     return;
@@ -1404,6 +1496,17 @@ const handleCoinGeckoRequest = async (request, response) => {
 
   if (assetRoute && request.method === 'DELETE') {
     handleDeleteAsset(request, response, Number(assetRoute[1]));
+    return;
+  }
+
+  const proventoRoute = /^\/api\/proventos\/(\d+)$/.exec(request.url || '');
+  if (proventoRoute && request.method === 'PUT') {
+    handleUpdateProvento(request, response, Number(proventoRoute[1]));
+    return;
+  }
+
+  if (proventoRoute && request.method === 'DELETE') {
+    handleDeleteProvento(request, response, Number(proventoRoute[1]));
     return;
   }
 

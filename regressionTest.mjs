@@ -6,6 +6,12 @@ import {
 } from './src/services/calculationService.js';
 import { calculateStaticRebalance } from './src/services/rebalanceService.js';
 import { createAsset, listAssets, updateAsset } from './src/services/assetsService.js';
+import {
+  createProvento as createProventoRequest,
+  deleteProvento as deleteProventoRequest,
+  listProventos,
+  updateProvento as updateProventoRequest
+} from './src/services/proventosService.js';
 
 const tests = [];
 
@@ -590,6 +596,85 @@ addTest(
         && firstRead[0].meta === 12.5
         && updated.meta === 22.75
         && secondRead[0].meta === 22.75;
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalLocalStorage === undefined) {
+        delete globalThis.localStorage;
+      } else {
+        globalThis.localStorage = originalLocalStorage;
+      }
+    }
+  }
+);
+
+addTest(
+  'Proventos podem ser criados, lidos, atualizados e deletados pela API',
+  {},
+  'POST, GET, PUT e DELETE preservam e removem o provento',
+  async () => {
+    const originalFetch = globalThis.fetch;
+    const originalLocalStorage = globalThis.localStorage;
+    let storedProventos = [];
+    let nextId = 1;
+    const jsonResponse = (payload) => ({
+      ok: true,
+      json: async () => JSON.parse(JSON.stringify(payload))
+    });
+
+    globalThis.localStorage = { getItem: () => 'test-token' };
+    globalThis.fetch = async (path, options = {}) => {
+      const method = options.method || 'GET';
+      if (options.headers?.Authorization !== 'Bearer test-token') {
+        return {
+          ok: false,
+          json: async () => ({ error: 'Autenticação necessária.' })
+        };
+      }
+
+      if (method === 'GET') {
+        return jsonResponse(storedProventos);
+      }
+      if (method === 'POST') {
+        const created = { id: nextId++, ...JSON.parse(options.body) };
+        storedProventos.push(created);
+        return jsonResponse(created);
+      }
+
+      const id = Number(path.split('/').pop());
+      const index = storedProventos.findIndex((item) => item.id === id);
+      if (index < 0) return { ok: false, json: async () => ({}) };
+
+      if (method === 'PUT') {
+        storedProventos[index] = { id, ...JSON.parse(options.body) };
+        return jsonResponse(storedProventos[index]);
+      }
+      if (method === 'DELETE') {
+        storedProventos.splice(index, 1);
+        return jsonResponse({ success: true });
+      }
+      return { ok: false, json: async () => ({}) };
+    };
+
+    try {
+      const entry = {
+        ticker: 'TEST3',
+        value: 12.5,
+        type: 'Dividendos',
+        date: '2026-10-19'
+      };
+      const created = await createProventoRequest(entry);
+      const firstRead = await listProventos();
+      const updated = await updateProventoRequest(created.id, { ...entry, value: 22.75 });
+      const secondRead = await listProventos();
+      await deleteProventoRequest(created.id);
+      const finalRead = await listProventos();
+
+      return created.value === 12.5
+        && firstRead.length === 1
+        && firstRead[0].value === 12.5
+        && updated.value === 22.75
+        && secondRead[0].value === 22.75
+        && finalRead.length === 0;
     } finally {
       globalThis.fetch = originalFetch;
       if (originalLocalStorage === undefined) {

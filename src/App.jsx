@@ -123,7 +123,8 @@ export default function App() {
     refreshAssets,
     clearAssets
   } = useAssets();
-  const { proventos, setProventos, addProvento, updateProvento, deleteProvento } = useProventos();
+  const { proventos, addProvento, updateProvento, deleteProvento } =
+    useProventos(isAuthenticated && !isAuthChecking);
   const {
     lang,
     setLang,

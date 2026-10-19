@@ -169,6 +169,30 @@ const initializeDatabase = async () => {
     await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['assets_meta_v1']);
   }
 
+  const [proventosMigration] = await db.execute(
+    'SELECT name FROM schema_migrations WHERE name = ?',
+    ['proventos_v1']
+  );
+  if (proventosMigration.length === 0) {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS proventos (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id INT UNSIGNED NOT NULL,
+        asset_id INT UNSIGNED NULL,
+        ticker VARCHAR(32) NOT NULL,
+        tipo VARCHAR(64) NOT NULL,
+        valor DECIMAL(12,2) NOT NULL,
+        data DATE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_proventos_user_id
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_proventos_asset_id
+          FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB
+    `);
+    await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['proventos_v1']);
+  }
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS mercadopago_webhook_events (
       event_id VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -374,6 +398,60 @@ export const updateAssetById = async (assetId, { ticker, type, qty, buyPrice, bu
 export const deleteAssetById = async (assetId) => {
   const [result] = await db.execute('DELETE FROM assets WHERE id = ?', [assetId]);
   return result;
+};
+
+const getProventoAssetId = async (userId, ticker) => {
+  const [rows] = await db.execute(
+    'SELECT id FROM assets WHERE user_id = ? AND ticker = ? ORDER BY id LIMIT 1',
+    [userId, ticker]
+  );
+  return rows[0]?.id ?? null;
+};
+
+export const getProventosByUserId = async (userId) => {
+  const [rows] = await db.execute(`
+    SELECT id, user_id, asset_id, ticker, tipo, valor, data, created_at
+    FROM proventos
+    WHERE user_id = ?
+    ORDER BY data DESC, id DESC
+  `, [userId]);
+  return rows;
+};
+
+export const getProventoById = async (proventoId, userId) => {
+  const [rows] = await db.execute(`
+    SELECT id, user_id, asset_id, ticker, tipo, valor, data, created_at
+    FROM proventos
+    WHERE id = ? AND user_id = ?
+  `, [proventoId, userId]);
+  return rows[0] || null;
+};
+
+export const createProvento = async ({ userId, ticker, type, value, date }) => {
+  const assetId = await getProventoAssetId(userId, ticker);
+  const [result] = await db.execute(`
+    INSERT INTO proventos (user_id, asset_id, ticker, tipo, valor, data)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `, [userId, assetId, ticker, type, value, date]);
+  return getProventoById(result.insertId, userId);
+};
+
+export const updateProventoById = async (proventoId, userId, { ticker, type, value, date }) => {
+  const assetId = await getProventoAssetId(userId, ticker);
+  await db.execute(`
+    UPDATE proventos
+    SET asset_id = ?, ticker = ?, tipo = ?, valor = ?, data = ?
+    WHERE id = ? AND user_id = ?
+  `, [assetId, ticker, type, value, date, proventoId, userId]);
+  return getProventoById(proventoId, userId);
+};
+
+export const deleteProventoById = async (proventoId, userId) => {
+  const [result] = await db.execute(
+    'DELETE FROM proventos WHERE id = ? AND user_id = ?',
+    [proventoId, userId]
+  );
+  return result.affectedRows > 0;
 };
 
 export const deleteUserAndAssets = async (userId) => {
