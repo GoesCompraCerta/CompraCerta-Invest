@@ -599,7 +599,8 @@ const toPublicAsset = (asset) => ({
   type: asset.type,
   qty: asset.qty,
   buyPrice: asset.buy_price,
-  buyDate: asset.buy_date
+  buyDate: asset.buy_date,
+  meta: asset.meta == null ? null : Number(asset.meta)
 });
 
 const requireActivePlan = async (request, response) => {
@@ -639,16 +640,18 @@ const readAndValidateAsset = async (request, response) => {
   const qty = Number(payload?.qty);
   const buyPrice = Number(payload?.buyPrice);
   const buyDate = payload?.buyDate;
+  const meta = payload?.meta == null || payload.meta === '' ? null : Number(payload.meta);
 
   if (!ticker || !Number.isFinite(qty) || qty <= 0
     || payload?.buyPrice === '' || payload?.buyPrice == null
     || !Number.isFinite(buyPrice) || buyPrice < 0
+    || (meta !== null && (!Number.isFinite(meta) || meta < 0 || meta > 100))
     || !isValidIsoDate(buyDate)) {
-    sendJson(response, 400, { error: 'Informe ticker, quantidade positiva, preço médio válido e data YYYY-MM-DD.' });
+    sendJson(response, 400, { error: 'Informe ticker, quantidade positiva, preço médio válido, meta entre 0 e 100 e data YYYY-MM-DD.' });
     return null;
   }
 
-  return { ticker, type: type || null, qty, buyPrice, buyDate };
+  return { ticker, type: type || null, qty, buyPrice, buyDate, meta };
 };
 
 const handleListAssets = async (request, response) => {

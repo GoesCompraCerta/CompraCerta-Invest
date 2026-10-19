@@ -6,7 +6,7 @@ const getToday = () => new Date().toISOString().split('T')[0];
 const normalizeAssetList = (value) => Array.isArray(value) ? value : [];
 const CORE_FIELDS = new Set([
   'id', 'user_id', 'ticker', 'type', 'qty', 'buyPrice', 'buy_price',
-  'buyDate', 'buy_date', 'created_at'
+  'buyDate', 'buy_date', 'created_at', 'meta'
 ]);
 let initialAssetsRequest = null;
 
@@ -20,7 +20,8 @@ const toApiAsset = (asset) => ({
   type: String(asset?.type || asset?.tipo || '').trim() || null,
   qty: Number(asset?.qty),
   buyPrice: Number(asset?.pm ?? asset?.buyPrice),
-  buyDate: getLegacyBuyDate(asset)
+  buyDate: getLegacyBuyDate(asset),
+  meta: asset?.meta == null || asset.meta === '' ? null : Number(asset.meta)
 });
 
 const getAssetSignature = (asset) => {
@@ -41,14 +42,18 @@ const getSupplementaryDetails = (asset) => Object.fromEntries(
 const mergeBackendAssets = (remoteAssets, details) => normalizeAssetList(remoteAssets).map((asset) => {
   const id = String(asset.id);
   const extra = details[id] && typeof details[id] === 'object' ? details[id] : {};
+  const supplementaryDetails = Object.fromEntries(
+    Object.entries(extra).filter(([key]) => key !== 'meta')
+  );
   return {
-    ...extra,
+    ...supplementaryDetails,
     ...asset,
     id,
     qty: Number(asset.qty) || 0,
     pm: Number(asset.buyPrice) || 0,
     price: Number(extra.price) || 0,
-    buyDate: String(asset.buyDate || '')
+    buyDate: String(asset.buyDate || ''),
+    meta: asset.meta == null ? null : Number(asset.meta)
   };
 });
 
@@ -65,6 +70,12 @@ const importLegacyAssets = async (remoteAssets, legacyAssets, details) => {
     if (!backendAsset) {
       backendAsset = await createAsset(toApiAsset(legacyAsset));
       importedAssets.push(backendAsset);
+    } else if (backendAsset.meta == null && legacyAsset.meta != null) {
+      backendAsset = await updateAsset(backendAsset.id, toApiAsset(legacyAsset));
+      const importedIndex = importedAssets.findIndex(
+        (asset) => String(asset.id) === String(backendAsset.id)
+      );
+      if (importedIndex >= 0) importedAssets[importedIndex] = backendAsset;
     }
 
     const backendId = String(backendAsset.id);

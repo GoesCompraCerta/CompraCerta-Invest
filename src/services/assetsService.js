@@ -1,4 +1,4 @@
-import { getToken } from './authService';
+import { getToken } from './authService.js';
 
 const request = async (path, options = {}) => {
   const token = getToken();

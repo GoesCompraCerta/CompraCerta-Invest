@@ -153,6 +153,22 @@ const initializeDatabase = async () => {
     ) ENGINE=InnoDB
   `);
 
+  const [assetMetaMigration] = await db.execute(
+    'SELECT name FROM schema_migrations WHERE name = ?',
+    ['assets_meta_v1']
+  );
+  if (assetMetaMigration.length === 0) {
+    const [assetMetaColumn] = await db.execute(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'assets' AND COLUMN_NAME = 'meta'
+    `);
+    if (assetMetaColumn.length === 0) {
+      await db.execute('ALTER TABLE assets ADD COLUMN meta DECIMAL(5,2) NULL');
+    }
+    await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['assets_meta_v1']);
+  }
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS mercadopago_webhook_events (
       event_id VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -321,7 +337,7 @@ export const activateUserPlanFromWebhook = async (eventId, userId, planExpiresAt
 
 export const getAssetsByUserId = async (userId) => {
   const [rows] = await db.execute(`
-    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, created_at
+    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta, created_at
     FROM assets
     WHERE user_id = ?
     ORDER BY id
@@ -331,27 +347,27 @@ export const getAssetsByUserId = async (userId) => {
 
 export const getAssetById = async (assetId) => {
   const [rows] = await db.execute(`
-    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, created_at
+    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta, created_at
     FROM assets
     WHERE id = ?
   `, [assetId]);
   return rows[0];
 };
 
-export const createAsset = async ({ userId, ticker, type, qty, buyPrice, buyDate }) => {
+export const createAsset = async ({ userId, ticker, type, qty, buyPrice, buyDate, meta }) => {
   const [result] = await db.execute(`
-    INSERT INTO assets (user_id, ticker, type, qty, buy_price, buy_date)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `, [userId, ticker, type, qty, buyPrice, buyDate]);
+    INSERT INTO assets (user_id, ticker, type, qty, buy_price, buy_date, meta)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `, [userId, ticker, type, qty, buyPrice, buyDate, meta]);
   return getAssetById(result.insertId);
 };
 
-export const updateAssetById = async (assetId, { ticker, type, qty, buyPrice, buyDate }) => {
+export const updateAssetById = async (assetId, { ticker, type, qty, buyPrice, buyDate, meta }) => {
   await db.execute(`
     UPDATE assets
-    SET ticker = ?, type = ?, qty = ?, buy_price = ?, buy_date = ?
+    SET ticker = ?, type = ?, qty = ?, buy_price = ?, buy_date = ?, meta = ?
     WHERE id = ?
-  `, [ticker, type, qty, buyPrice, buyDate, assetId]);
+  `, [ticker, type, qty, buyPrice, buyDate, meta, assetId]);
   return getAssetById(assetId);
 };
 

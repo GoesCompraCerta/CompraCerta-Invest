@@ -5,6 +5,7 @@ import {
   getSelectedFiiDy
 } from './src/services/calculationService.js';
 import { calculateStaticRebalance } from './src/services/rebalanceService.js';
+import { createAsset, listAssets, updateAsset } from './src/services/assetsService.js';
 
 const tests = [];
 
@@ -550,12 +551,62 @@ addTest(
   }
 );
 
+addTest(
+  'Meta do ativo e enviada, atualizada e lida pela API',
+  {},
+  'POST, PUT e GET preservam o percentual da meta',
+  async () => {
+    const originalFetch = globalThis.fetch;
+    const originalLocalStorage = globalThis.localStorage;
+    let storedAssets = [];
+
+    globalThis.localStorage = { getItem: () => 'test-token' };
+    globalThis.fetch = async (_path, options = {}) => {
+      const method = options.method || 'GET';
+      if (method === 'POST') {
+        storedAssets = [{ id: 1, ...JSON.parse(options.body) }];
+      } else if (method === 'PUT') {
+        storedAssets = [{ id: 1, ...JSON.parse(options.body) }];
+      }
+      const payload = method === 'GET' ? storedAssets : storedAssets[0];
+      return { ok: true, json: async () => payload };
+    };
+
+    try {
+      const asset = {
+        ticker: 'TEST3',
+        type: 'Ações',
+        qty: 1,
+        buyPrice: 10,
+        buyDate: '2026-10-19',
+        meta: 12.5
+      };
+      const created = await createAsset(asset);
+      const firstRead = await listAssets();
+      const updated = await updateAsset(1, { ...asset, meta: 22.75 });
+      const secondRead = await listAssets();
+
+      return created.meta === 12.5
+        && firstRead[0].meta === 12.5
+        && updated.meta === 22.75
+        && secondRead[0].meta === 22.75;
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalLocalStorage === undefined) {
+        delete globalThis.localStorage;
+      } else {
+        globalThis.localStorage = originalLocalStorage;
+      }
+    }
+  }
+);
+
 let passed = 0;
 const failures = [];
 
 for (const test of tests) {
   try {
-    if (test.check()) {
+    if (await test.check()) {
       passed += 1;
       console.log(`PASSOU | ${test.name}`);
     } else {
