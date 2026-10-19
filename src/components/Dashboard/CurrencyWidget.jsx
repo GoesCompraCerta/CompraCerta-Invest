@@ -41,7 +41,9 @@ export default function CurrencyWidget({ t, lang }) {
     setError('');
 
     try {
-      const response = await fetch('/api/exchange-rates');
+      const response = await fetch(
+        `/api/exchange-rates${forceRefresh ? '?refresh=1' : ''}`
+      );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data = await response.json();

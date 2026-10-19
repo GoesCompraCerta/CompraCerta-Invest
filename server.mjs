@@ -1460,15 +1460,17 @@ const handleCoinGeckoRequest = async (request, response) => {
     }
   };
 
-  const handleExchangeRatesRequest = async (_request, response) => {
+  const handleExchangeRatesRequest = async (request, response) => {
     const cacheKey = 'exchange-rates';
+    const requestUrl = new URL(request.url, `http://${request.headers.host}`);
+    const forceRefresh = requestUrl.searchParams.get('refresh') === '1';
     let cachedEntry = null;
     try {
       cachedEntry = await getMarketCache(cacheKey);
     } catch (error) {
       console.warn('[market-cache] Não foi possível ler o cache de câmbio:', error.message);
     }
-    if (cachedEntry && cachedEntry.ageSeconds < MARKET_CACHE_TTL_SECONDS) {
+    if (!forceRefresh && cachedEntry && cachedEntry.ageSeconds < MARKET_CACHE_TTL_SECONDS) {
       console.log('[exchange-rates] Retornando cotação do cache.');
       sendJson(response, 200, cachedEntry.value);
       return;
@@ -1534,7 +1536,7 @@ const handleCoinGeckoRequest = async (request, response) => {
     return;
   }
 
-  if (request.method === 'GET' && request.url === '/api/exchange-rates') {
+  if (request.method === 'GET' && request.url?.split('?')[0] === '/api/exchange-rates') {
     handleExchangeRatesRequest(request, response);
     return;
   }
