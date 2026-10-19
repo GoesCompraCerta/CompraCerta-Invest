@@ -193,6 +193,32 @@ const initializeDatabase = async () => {
     await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['proventos_v1']);
   }
 
+  const [assetsPriceMigration] = await db.execute(
+    'SELECT name FROM schema_migrations WHERE name = ?',
+    ['assets_price_v1']
+  );
+  if (assetsPriceMigration.length === 0) {
+    const [priceColumn] = await db.execute(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'assets' AND COLUMN_NAME = 'price'
+    `);
+    if (priceColumn.length === 0) {
+      await db.execute('ALTER TABLE assets ADD COLUMN price DECIMAL(18,6) NULL');
+    }
+
+    const [priceUpdatedAtColumn] = await db.execute(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'assets' AND COLUMN_NAME = 'price_updated_at'
+    `);
+    if (priceUpdatedAtColumn.length === 0) {
+      await db.execute('ALTER TABLE assets ADD COLUMN price_updated_at DATETIME NULL');
+    }
+
+    await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['assets_price_v1']);
+  }
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS mercadopago_webhook_events (
       event_id VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -361,7 +387,8 @@ export const activateUserPlanFromWebhook = async (eventId, userId, planExpiresAt
 
 export const getAssetsByUserId = async (userId) => {
   const [rows] = await db.execute(`
-    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta, created_at
+    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta,
+      price, price_updated_at, created_at
     FROM assets
     WHERE user_id = ?
     ORDER BY id
@@ -371,11 +398,40 @@ export const getAssetsByUserId = async (userId) => {
 
 export const getAssetById = async (assetId) => {
   const [rows] = await db.execute(`
-    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta, created_at
+    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta,
+      price, price_updated_at, created_at
     FROM assets
     WHERE id = ?
   `, [assetId]);
   return rows[0];
+};
+
+export const updateAssetPricesByUserId = async (userId, updates) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    for (const { id, price } of updates) {
+      await connection.execute(`
+        UPDATE assets
+        SET price = ?, price_updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+      `, [price, id, userId]);
+    }
+    const [rows] = await connection.execute(`
+      SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta,
+        price, price_updated_at, created_at
+      FROM assets
+      WHERE user_id = ?
+      ORDER BY id
+    `, [userId]);
+    await connection.commit();
+    return rows;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 };
 
 export const createAsset = async ({ userId, ticker, type, qty, buyPrice, buyDate, meta }) => {

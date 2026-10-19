@@ -25,6 +25,7 @@ import {
   initDb,
   resetPasswordWithToken,
   updateAssetById,
+  updateAssetPricesByUserId,
   updateProventoById,
   updateUserPlan
 } from './server/db.js';
@@ -605,7 +606,9 @@ const toPublicAsset = (asset) => ({
   qty: asset.qty,
   buyPrice: asset.buy_price,
   buyDate: asset.buy_date,
-  meta: asset.meta == null ? null : Number(asset.meta)
+  meta: asset.meta == null ? null : Number(asset.meta),
+  price: asset.price == null ? null : Number(asset.price),
+  price_updated_at: asset.price_updated_at || null
 });
 
 const requireActivePlan = async (request, response) => {
@@ -710,6 +713,38 @@ const handleDeleteAsset = async (request, response, assetId) => {
 
   await deleteAssetById(assetId);
   sendJson(response, 200, { success: true });
+};
+
+const handleUpdateAssetPrices = async (request, response) => {
+  const userId = await requireActivePlan(request, response);
+  if (!userId) return;
+
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  if (!Array.isArray(payload?.assets) || payload.assets.length === 0) {
+    sendJson(response, 400, { error: 'Informe uma lista de cotações.' });
+    return;
+  }
+
+  const updates = payload.assets.map(({ id, price }) => ({
+    id: Number(id),
+    price: Number(price)
+  }));
+  if (updates.some(({ id, price }) =>
+    !Number.isSafeInteger(id) || id <= 0 || !Number.isFinite(price) || price <= 0
+  )) {
+    sendJson(response, 400, { error: 'Informe IDs e cotações válidos.' });
+    return;
+  }
+
+  const assets = await updateAssetPricesByUserId(userId, updates);
+  sendJson(response, 200, assets.map(toPublicAsset));
 };
 
 const toPublicProvento = (provento) => ({
@@ -1465,6 +1500,11 @@ const handleCoinGeckoRequest = async (request, response) => {
 
   if (request.method === 'POST' && request.url === '/api/assets') {
     handleCreateAsset(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && request.url === '/api/assets/update-prices') {
+    handleUpdateAssetPrices(request, response);
     return;
   }
 

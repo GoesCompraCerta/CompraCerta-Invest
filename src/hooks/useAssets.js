@@ -1,14 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { assetsStorage, assetDetailsStorage } from '../services/storageService';
-import { createAsset, deleteAsset, listAssets, updateAsset } from '../services/assetsService';
+import { fetchAssetData } from '../services/assetService';
+import {
+  createAsset,
+  deleteAsset,
+  listAssets,
+  updateAsset,
+  updateAssetPrices
+} from '../services/assetsService';
 
 const getToday = () => new Date().toISOString().split('T')[0];
 const normalizeAssetList = (value) => Array.isArray(value) ? value : [];
 const CORE_FIELDS = new Set([
   'id', 'user_id', 'ticker', 'type', 'qty', 'buyPrice', 'buy_price',
-  'buyDate', 'buy_date', 'created_at', 'meta'
+  'buyDate', 'buy_date', 'created_at', 'meta', 'price_updated_at'
 ]);
 let initialAssetsRequest = null;
+const PRICE_MAX_AGE_MS = 15 * 60 * 1000;
 
 const getLegacyBuyDate = (asset) => {
   const date = String(asset?.buyDate || asset?.createdAt || getToday()).slice(0, 10);
@@ -39,6 +47,49 @@ const getSupplementaryDetails = (asset) => Object.fromEntries(
   Object.entries(asset || {}).filter(([key]) => !CORE_FIELDS.has(key))
 );
 
+const needsPriceRefresh = (asset) => {
+  const price = Number(asset.price);
+  const updatedAt = Date.parse(asset.price_updated_at || '');
+  return !Number.isFinite(price) || price <= 0
+    || !Number.isFinite(updatedAt)
+    || Date.now() - updatedAt > PRICE_MAX_AGE_MS;
+};
+
+const refreshStaleAssetPrices = async (assets) => {
+  const updates = (await Promise.all(assets.map(async (asset) => {
+    if (!needsPriceRefresh(asset)) return null;
+    try {
+      const quote = await fetchAssetData(asset);
+      const price = Number(quote.price);
+      return Number.isFinite(price) && price > 0
+        ? { id: Number(asset.id), price }
+        : null;
+    } catch {
+      return null;
+    }
+  }))).filter(Boolean);
+
+  if (updates.length === 0) return assets;
+  const updatesById = new Map(updates.map((item) => [String(item.id), item]));
+  const refreshed = assets.map((asset) => {
+    const quote = updatesById.get(String(asset.id));
+    return quote ? { ...asset, price: quote.price } : asset;
+  });
+
+  try {
+    const savedAssets = await updateAssetPrices(updates);
+    const savedById = new Map(savedAssets.map((asset) => [String(asset.id), asset]));
+    return refreshed.map((asset) => {
+      const saved = savedById.get(String(asset.id));
+      return saved
+        ? { ...asset, price: Number(saved.price), price_updated_at: saved.price_updated_at }
+        : asset;
+    });
+  } catch {
+    return refreshed;
+  }
+};
+
 const mergeBackendAssets = (remoteAssets, details) => normalizeAssetList(remoteAssets).map((asset) => {
   const id = String(asset.id);
   const extra = details[id] && typeof details[id] === 'object' ? details[id] : {};
@@ -51,9 +102,10 @@ const mergeBackendAssets = (remoteAssets, details) => normalizeAssetList(remoteA
     id,
     qty: Number(asset.qty) || 0,
     pm: Number(asset.buyPrice) || 0,
-    price: Number(extra.price) || 0,
+    price: asset.price == null ? (Number(extra.price) || 0) : Number(asset.price),
     buyDate: String(asset.buyDate || ''),
-    meta: asset.meta == null ? null : Number(asset.meta)
+    meta: asset.meta == null ? null : Number(asset.meta),
+    price_updated_at: asset.price_updated_at || null
   };
 });
 
@@ -104,7 +156,8 @@ const loadBackendAssets = async () => {
         remoteAssets = await importLegacyAssets(remoteAssets, legacyAssets, details);
       }
 
-      return mergeBackendAssets(remoteAssets, details);
+      const pricedAssets = await refreshStaleAssetPrices(remoteAssets);
+      return mergeBackendAssets(pricedAssets, details);
     })().finally(() => {
       initialAssetsRequest = null;
     });
@@ -171,7 +224,21 @@ export const useAssets = () => {
       const details = assetDetailsStorage.get();
       details[String(saved.id)] = getSupplementaryDetails(updatedAsset);
       const savedDetails = assetDetailsStorage.set(details);
-      const merged = mergeBackendAssets([saved], details)[0];
+      let savedWithPrice = saved;
+      const price = Number(updatedAsset.price);
+      if (Number.isFinite(price) && price > 0) {
+        try {
+          const pricedAssets = await updateAssetPrices([
+            { id: Number(saved.id), price }
+          ]);
+          savedWithPrice = pricedAssets.find(
+            (asset) => String(asset.id) === String(saved.id)
+          ) || { ...saved, price };
+        } catch {
+          savedWithPrice = { ...saved, price };
+        }
+      }
+      const merged = mergeBackendAssets([savedWithPrice], details)[0];
       setAssets((current) => normalizeAssetList(current).map((asset) =>
         String(asset.id) === String(assetId) ? merged : asset
       ));

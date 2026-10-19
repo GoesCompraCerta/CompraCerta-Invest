@@ -48,3 +48,8 @@ export const updateAsset = (id, data) => request(`/api/assets/${encodeURICompone
 export const deleteAsset = (id) => request(`/api/assets/${encodeURIComponent(id)}`, {
   method: 'DELETE'
 });
+
+export const updateAssetPrices = (assets) => request('/api/assets/update-prices', {
+  method: 'POST',
+  body: JSON.stringify({ assets })
+});

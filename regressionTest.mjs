@@ -5,7 +5,12 @@ import {
   getSelectedFiiDy
 } from './src/services/calculationService.js';
 import { calculateStaticRebalance } from './src/services/rebalanceService.js';
-import { createAsset, listAssets, updateAsset } from './src/services/assetsService.js';
+import {
+  createAsset,
+  listAssets,
+  updateAsset,
+  updateAssetPrices
+} from './src/services/assetsService.js';
 import {
   createProvento as createProventoRequest,
   deleteProvento as deleteProventoRequest,
@@ -596,6 +601,67 @@ addTest(
         && firstRead[0].meta === 12.5
         && updated.meta === 22.75
         && secondRead[0].meta === 22.75;
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalLocalStorage === undefined) {
+        delete globalThis.localStorage;
+      } else {
+        globalThis.localStorage = originalLocalStorage;
+      }
+    }
+  }
+);
+
+addTest(
+  'Preço do ativo pode ser lido e atualizado pela API',
+  {},
+  'GET devolve o preço persistido e POST atualiza preço e timestamp',
+  async () => {
+    const originalFetch = globalThis.fetch;
+    const originalLocalStorage = globalThis.localStorage;
+    const storedAssets = [{
+      id: 17,
+      ticker: 'TEST3',
+      price: 10,
+      price_updated_at: '2026-10-19 10:00:00'
+    }];
+    const jsonResponse = (payload) => ({
+      ok: true,
+      json: async () => JSON.parse(JSON.stringify(payload))
+    });
+
+    globalThis.localStorage = { getItem: () => 'test-token' };
+    globalThis.fetch = async (path, options = {}) => {
+      if (options.headers?.Authorization !== 'Bearer test-token') {
+        return { ok: false, json: async () => ({ error: 'Autenticação necessária.' }) };
+      }
+      if (path === '/api/assets' && !options.method) {
+        return jsonResponse(storedAssets);
+      }
+      if (path === '/api/assets/update-prices' && options.method === 'POST') {
+        const updates = JSON.parse(options.body).assets;
+        for (const update of updates) {
+          const asset = storedAssets.find((item) => item.id === update.id);
+          if (asset) {
+            asset.price = update.price;
+            asset.price_updated_at = '2026-10-19 10:10:00';
+          }
+        }
+        return jsonResponse(storedAssets);
+      }
+      return { ok: false, json: async () => ({}) };
+    };
+
+    try {
+      const initialAssets = await listAssets();
+      const updatedAssets = await updateAssetPrices([{ id: 17, price: 12.345678 }]);
+      const reloadedAssets = await listAssets();
+
+      return initialAssets[0].price === 10
+        && Boolean(initialAssets[0].price_updated_at)
+        && updatedAssets[0].price === 12.345678
+        && reloadedAssets[0].price === 12.345678
+        && reloadedAssets[0].price_updated_at === '2026-10-19 10:10:00';
     } finally {
       globalThis.fetch = originalFetch;
       if (originalLocalStorage === undefined) {
