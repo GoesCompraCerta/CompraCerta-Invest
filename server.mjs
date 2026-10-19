@@ -1151,7 +1151,7 @@ const validateEvolutionInput = (payload) => {
 };
 
 const handlePortfolioEvolution = async (request, response) => {
-  if (!requireActivePlan(request, response)) return;
+  if (!(await requireActivePlan(request, response))) return;
 
   let payload;
   try {
