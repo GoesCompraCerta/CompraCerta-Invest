@@ -16,7 +16,7 @@ const CORE_FIELDS = new Set([
   'buyDate', 'buy_date', 'created_at', 'meta', 'price_updated_at'
 ]);
 let initialAssetsRequest = null;
-const PRICE_MAX_AGE_MS = 15 * 60 * 1000;
+const PRICE_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 
 const getLegacyBuyDate = (asset) => {
   const date = String(asset?.buyDate || asset?.createdAt || getToday()).slice(0, 10);
@@ -49,7 +49,10 @@ const getSupplementaryDetails = (asset) => Object.fromEntries(
 
 const needsPriceRefresh = (asset) => {
   const price = Number(asset.price);
-  const updatedAt = Date.parse(asset.price_updated_at || '');
+  const timestamp = String(asset.price_updated_at || '');
+  const updatedAt = Date.parse(
+    timestamp.includes('T') ? timestamp : `${timestamp.replace(' ', 'T')}Z`
+  );
   return !Number.isFinite(price) || price <= 0
     || !Number.isFinite(updatedAt)
     || Date.now() - updatedAt > PRICE_MAX_AGE_MS;
@@ -218,7 +221,8 @@ export const useAssets = () => {
     }
 
     setError('');
-    const updatedAsset = { ...currentAsset, ...updates };
+    const { forcePriceUpdate, ...assetUpdates } = updates;
+    const updatedAsset = { ...currentAsset, ...assetUpdates };
     try {
       const saved = await updateAsset(assetId, toApiAsset(updatedAsset));
       const details = assetDetailsStorage.get();
@@ -226,7 +230,7 @@ export const useAssets = () => {
       const savedDetails = assetDetailsStorage.set(details);
       let savedWithPrice = saved;
       const price = Number(updatedAsset.price);
-      if (Number.isFinite(price) && price > 0) {
+      if (forcePriceUpdate && Number.isFinite(price) && price > 0) {
         try {
           const pricedAssets = await updateAssetPrices([
             { id: Number(saved.id), price }

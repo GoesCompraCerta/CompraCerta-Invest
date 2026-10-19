@@ -18,6 +18,7 @@ import {
   deleteUserAndAssets,
   getAssetById,
   getAssetsByUserId,
+  getMarketCache,
   getProventoById,
   getProventosByUserId,
   getUserByEmail,
@@ -27,7 +28,8 @@ import {
   updateAssetById,
   updateAssetPricesByUserId,
   updateProventoById,
-  updateUserPlan
+  updateUserPlan,
+  setMarketCache
 } from './server/db.js';
 import { assertJwtSecret, generateToken, hashPassword, requireAuth, verifyPassword } from './server/auth.js';
 import { sendPasswordResetEmail } from './server/emailService.js';
@@ -56,15 +58,9 @@ const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 const ALLOWED_SERIES = new Set(['12', '196', '433', '4390', '4392']);
 const MAX_CHUNK_YEARS = 5;
 const QUOTE_CACHE_TTL = 60 * 1000;
-const EVOLUTION_CACHE_TTL = 60 * 60 * 1000;
-const BCB_CACHE_TTL = 24 * 60 * 60 * 1000;
-const EXCHANGE_RATES_CACHE_TTL = 24 * 60 * 60 * 1000;
-const evolutionCache = new Map();
-const bcbSeriesCache = new Map();
-const historicalQuoteCache = new Map();
+const MARKET_CACHE_TTL_SECONDS = 12 * 60 * 60;
 const coinGeckoQuoteCache = new Map();
 const brapiQuoteCache = new Map();
-const exchangeRatesCache = new Map();
 const COINGECKO_COINS = {
   BTC: 'bitcoin',
   ETH: 'ethereum',
@@ -904,16 +900,23 @@ const fetchBcbChunk = async (series, start, end) => {
 };
 
 const fetchBcbSeries = async (series, startDate, endDate) => {
-  const cacheKey = String(series);
-  const cached = bcbSeriesCache.get(cacheKey);
+  const cacheKey = `bcb:${series}`;
+  let cachedEntry = null;
+  try {
+    cachedEntry = await getMarketCache(cacheKey);
+  } catch (error) {
+    console.warn('[market-cache] Não foi possível ler a série do Banco Central:', error.message);
+  }
+  const cachedValue = Array.isArray(cachedEntry?.value?.data) ? cachedEntry.value : null;
   const requestedStart = startDate.toISOString().slice(0, 10);
   const requestedEnd = endDate.toISOString().slice(0, 10);
-  const isCacheFresh = cached && Date.now() - cached.timestamp < BCB_CACHE_TTL;
+  const isCacheFresh = cachedEntry
+    && cachedEntry.ageSeconds < MARKET_CACHE_TTL_SECONDS;
   const cacheCoversRequest = isCacheFresh
-    && cached.startDate <= requestedStart
-    && cached.endDate >= requestedEnd;
+    && cachedValue?.startDate <= requestedStart
+    && cachedValue?.endDate >= requestedEnd;
 
-  if (cacheCoversRequest) return cached.data;
+  if (cacheCoversRequest) return cachedValue.data;
 
   try {
     const chunks = splitDateRange(startDate, endDate);
@@ -922,7 +925,7 @@ const fetchBcbSeries = async (series, startDate, endDate) => {
     );
     const unique = new Map();
 
-    [...(cached?.data || []), ...responses.flat()].forEach((item) => {
+    [...(cachedValue?.data || []), ...responses.flat()].forEach((item) => {
       if (item?.data && item?.valor != null) unique.set(item.data, item);
     });
 
@@ -931,22 +934,26 @@ const fetchBcbSeries = async (series, startDate, endDate) => {
       const secondDate = second.data.split('/').reverse().join('-');
       return firstDate.localeCompare(secondDate);
     });
-    const coverageStart = cached?.startDate && cached.startDate < requestedStart
-      ? cached.startDate
+    const coverageStart = cachedValue?.startDate && cachedValue.startDate < requestedStart
+      ? cachedValue.startDate
       : requestedStart;
-    const coverageEnd = cached?.endDate && cached.endDate > requestedEnd
-      ? cached.endDate
+    const coverageEnd = cachedValue?.endDate && cachedValue.endDate > requestedEnd
+      ? cachedValue.endDate
       : requestedEnd;
 
-    bcbSeriesCache.set(cacheKey, {
+    const cacheValue = {
       data,
-      timestamp: Date.now(),
       startDate: coverageStart,
       endDate: coverageEnd
-    });
+    };
+    try {
+      await setMarketCache(cacheKey, cacheValue);
+    } catch (error) {
+      console.warn('[market-cache] Não foi possível salvar a série do Banco Central:', error.message);
+    }
     return data;
   } catch {
-    return cached?.data || [];
+    return cachedValue?.data || [];
   }
 };
 
@@ -1013,10 +1020,24 @@ const fetchYahooMonthlyQuotes = async (ticker, startDate, endDate, market = 'aut
     : market === 'brazil' ? [`${symbol}.SA`]
       : market === 'international' ? [symbol]
         : [symbol, `${symbol}.SA`];
-  const cacheKey = `${candidates.join(',')}|${startDate}|${endDate}`;
-  const cached = historicalQuoteCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.quotes;
-  historicalQuoteCache.delete(cacheKey);
+  const cacheKey = `benchmark:yahoo:${candidates.join(',')}`;
+  let cachedEntry = null;
+  try {
+    cachedEntry = await getMarketCache(cacheKey);
+  } catch (error) {
+    console.warn('[market-cache] Não foi possível ler o histórico Yahoo:', error.message);
+  }
+  const cachedValue = Array.isArray(cachedEntry?.value?.quotes) ? cachedEntry.value : null;
+  const cachedQuotes = (cachedValue?.quotes || []).map((quote) => ({
+    date: new Date(quote.date),
+    close: Number(quote.close)
+  })).filter((quote) => !Number.isNaN(quote.date.getTime()) && Number.isFinite(quote.close));
+  const isCacheFresh = cachedEntry
+    && cachedEntry.ageSeconds < MARKET_CACHE_TTL_SECONDS;
+  const cacheCoversRequest = isCacheFresh
+    && cachedValue?.startDate <= startDate
+    && cachedValue?.endDate >= endDate;
+  if (cacheCoversRequest) return cachedQuotes;
   let lastError = null;
 
   for (const candidate of candidates) {
@@ -1033,10 +1054,25 @@ const fetchYahooMonthlyQuotes = async (ticker, startDate, endDate, market = 'aut
         .sort((first, second) => first.date - second.date);
 
       if (quotes.length > 0) {
-        historicalQuoteCache.set(cacheKey, {
-          quotes,
-          expiresAt: Date.now() + EVOLUTION_CACHE_TTL
+        const unique = new Map();
+        [...cachedQuotes, ...quotes].forEach((quote) => {
+          unique.set(quote.date.toISOString(), quote);
         });
+        const cachedStartDate = cachedValue?.startDate;
+        const cachedEndDate = cachedValue?.endDate;
+        const cacheValue = {
+          quotes: [...unique.values()].map((quote) => ({
+            date: quote.date.toISOString(),
+            close: quote.close
+          })),
+          startDate: cachedStartDate && cachedStartDate < startDate ? cachedStartDate : startDate,
+          endDate: cachedEndDate && cachedEndDate > endDate ? cachedEndDate : endDate
+        };
+        try {
+          await setMarketCache(cacheKey, cacheValue);
+        } catch (error) {
+          console.warn('[market-cache] Não foi possível salvar o histórico Yahoo:', error.message);
+        }
         return quotes;
       }
       lastError = new Error(`Yahoo não retornou cotações para ${candidate}.`);
@@ -1045,6 +1081,7 @@ const fetchYahooMonthlyQuotes = async (ticker, startDate, endDate, market = 'aut
     }
   }
 
+  if (cachedQuotes.length > 0) return cachedQuotes;
   throw lastError || new Error(`Falha ao consultar ${ticker}.`);
 };
 
@@ -1119,10 +1156,6 @@ const buildYahooAccumulatedSeries = (quotes, months) => {
   return result;
 };
 
-const evolutionCacheKey = (payload) => createHash('md5')
-  .update(JSON.stringify({ formulaVersion: 6, payload }))
-  .digest('hex');
-
 const validateEvolutionInput = (payload) => {
   if (!payload || !Array.isArray(payload.ativos) || payload.ativos.length === 0) {
     return 'ativos deve ser um array não vazio.';
@@ -1166,14 +1199,6 @@ const handlePortfolioEvolution = async (request, response) => {
     sendJson(response, 400, { error: validationError });
     return;
   }
-
-  const cacheKey = evolutionCacheKey(payload);
-  const cached = evolutionCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    sendJson(response, 200, cached.value);
-    return;
-  }
-  evolutionCache.delete(cacheKey);
 
   const now = new Date();
   const end = monthEnd(now);
@@ -1247,7 +1272,6 @@ const handlePortfolioEvolution = async (request, response) => {
     avisos: []
   };
 
-  evolutionCache.set(cacheKey, { expiresAt: Date.now() + EVOLUTION_CACHE_TTL, value: result });
   sendJson(response, 200, result);
 };
 
@@ -1425,10 +1449,15 @@ const handleCoinGeckoRequest = async (request, response) => {
 
   const handleExchangeRatesRequest = async (_request, response) => {
     const cacheKey = 'exchange-rates';
-    const cached = exchangeRatesCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < EXCHANGE_RATES_CACHE_TTL) {
+    let cachedEntry = null;
+    try {
+      cachedEntry = await getMarketCache(cacheKey);
+    } catch (error) {
+      console.warn('[market-cache] Não foi possível ler o cache de câmbio:', error.message);
+    }
+    if (cachedEntry && cachedEntry.ageSeconds < MARKET_CACHE_TTL_SECONDS) {
       console.log('[exchange-rates] Retornando cotação do cache.');
-      sendJson(response, 200, cached.data);
+      sendJson(response, 200, cachedEntry.value);
       return;
     }
 
@@ -1451,7 +1480,11 @@ const handleCoinGeckoRequest = async (request, response) => {
           throw new Error('AwesomeAPI retornou dados de câmbio inválidos.');
         }
 
-        exchangeRatesCache.set(cacheKey, { data: rates, timestamp: Date.now() });
+        try {
+          await setMarketCache(cacheKey, rates);
+        } catch (error) {
+          console.warn('[market-cache] Não foi possível salvar o cache de câmbio:', error.message);
+        }
         sendJson(response, 200, rates);
         return;
       } catch (error) {
@@ -1463,9 +1496,9 @@ const handleCoinGeckoRequest = async (request, response) => {
       }
     }
 
-    if (cached) {
+    if (cachedEntry) {
       console.log('[exchange-rates] Usando cache expirado após falha na AwesomeAPI.');
-      sendJson(response, 200, cached.data);
+      sendJson(response, 200, cachedEntry.value);
       return;
     }
 

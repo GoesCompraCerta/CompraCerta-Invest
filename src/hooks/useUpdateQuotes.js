@@ -23,6 +23,7 @@ export const useUpdateQuotes = () => {
       try {
         const incoming = await fetchAssetData(asset);
         const mergedUpdates = {
+          forcePriceUpdate: true,
           price: incoming.price ?? asset.price,
           priceOriginal: incoming.priceOriginal ?? asset.priceOriginal ?? null,
           priceCurrency: incoming.priceCurrency ?? asset.priceCurrency ?? 'BRL',

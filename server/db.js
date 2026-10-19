@@ -219,6 +219,21 @@ const initializeDatabase = async () => {
     await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['assets_price_v1']);
   }
 
+  const [marketCacheMigration] = await db.execute(
+    'SELECT name FROM schema_migrations WHERE name = ?',
+    ['market_cache_v1']
+  );
+  if (marketCacheMigration.length === 0) {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS market_cache (
+        chave VARCHAR(255) NOT NULL PRIMARY KEY,
+        valor TEXT NOT NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB
+    `);
+    await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['market_cache_v1']);
+  }
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS mercadopago_webhook_events (
       event_id VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -454,6 +469,34 @@ export const updateAssetById = async (assetId, { ticker, type, qty, buyPrice, bu
 export const deleteAssetById = async (assetId) => {
   const [result] = await db.execute('DELETE FROM assets WHERE id = ?', [assetId]);
   return result;
+};
+
+export const getMarketCache = async (key) => {
+  const [rows] = await db.execute(`
+    SELECT valor,
+      TIMESTAMPDIFF(SECOND, updated_at, CURRENT_TIMESTAMP) AS age_seconds
+    FROM market_cache
+    WHERE chave = ?
+  `, [key]);
+  if (!rows[0]) return null;
+
+  try {
+    return {
+      value: JSON.parse(rows[0].valor),
+      ageSeconds: Number(rows[0].age_seconds)
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const setMarketCache = async (key, value) => {
+  await db.execute(`
+    INSERT INTO market_cache (chave, valor, updated_at)
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON DUPLICATE KEY UPDATE
+      valor = VALUES(valor), updated_at = CURRENT_TIMESTAMP
+  `, [key, JSON.stringify(value)]);
 };
 
 const getProventoAssetId = async (userId, ticker) => {
