@@ -909,7 +909,8 @@ const fetchBcbSeries = async (series, startDate, endDate) => {
   const requestedEnd = endDate.toISOString().slice(0, 10);
   const isCacheFresh = cachedEntry
     && cachedEntry.ageSeconds < MARKET_CACHE_TTL_SECONDS;
-  const cacheCoversRequest = isCacheFresh
+  const cacheHasData = cachedValue?.data.length > 0;
+  const cacheCoversRequest = isCacheFresh && cacheHasData
     && cachedValue?.startDate <= requestedStart
     && cachedValue?.endDate >= requestedEnd;
 

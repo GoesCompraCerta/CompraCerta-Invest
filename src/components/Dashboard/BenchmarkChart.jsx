@@ -22,6 +22,7 @@ const SERIES = [
 
 const STORAGE_KEY = 'benchmark_last_result';
 const CACHE_VERSION = 7;
+const BROWSER_CACHE_TTL_MS = 60 * 60 * 1000;
 const normalizeAssets = (assets) => Array.isArray(assets) ? assets : [];
 const readCurrentAssets = (providedAssets) => {
   const currentAssets = normalizeAssets(providedAssets);
@@ -84,7 +85,10 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
       if (!saved) return false;
-      if (saved.cacheVersion !== CACHE_VERSION || saved.requestedMonths !== months || !Array.isArray(saved.serie) || !saved.portfolioHash) {
+      const isEstimated = Array.isArray(saved.avisos) && saved.avisos.includes('Estimativa');
+      const isExpired = !Number.isFinite(saved.generatedAt)
+        || Date.now() - saved.generatedAt > BROWSER_CACHE_TTL_MS;
+      if (isEstimated || isExpired || saved.cacheVersion !== CACHE_VERSION || saved.requestedMonths !== months || !Array.isArray(saved.serie) || !saved.portfolioHash) {
         localStorage.removeItem(STORAGE_KEY);
         return false;
       }
@@ -151,6 +155,7 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           ...payload,
+          generatedAt: Date.now(),
           cacheVersion: CACHE_VERSION,
           requestedMonths: months,
           portfolioHash

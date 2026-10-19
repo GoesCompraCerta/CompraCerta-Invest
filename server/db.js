@@ -491,6 +491,11 @@ export const getMarketCache = async (key) => {
 };
 
 export const setMarketCache = async (key, value) => {
+  const hasEmptyArray = Array.isArray(value)
+    ? value.length === 0
+    : Array.isArray(value?.data) && value.data.length === 0;
+  if (value == null || hasEmptyArray) return;
+
   await db.execute(`
     INSERT INTO market_cache (chave, valor, updated_at)
     VALUES (?, ?, CURRENT_TIMESTAMP)
