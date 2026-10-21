@@ -874,16 +874,30 @@ const fetchBcbChunk = async (series, start, end) => {
 
   try {
     const upstream = await fetch(targetUrl, {
-      headers: { Accept: 'application/json' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        Accept: 'application/json, text/plain, */*',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'
+      },
       signal: AbortSignal.timeout(10_000)
     });
+    const responseBody = await upstream.text();
     if (!upstream.ok) {
       const error = new Error(`Banco Central respondeu HTTP ${upstream.status}`);
       error.status = upstream.status;
+      error.responseBody = responseBody.slice(0, 1000);
       throw error;
     }
 
-    const payload = await upstream.json();
+    let payload;
+    try {
+      payload = JSON.parse(responseBody);
+    } catch {
+      const error = new Error('Banco Central retornou conteúdo que não é JSON.');
+      error.status = upstream.status;
+      error.responseBody = responseBody.slice(0, 1000);
+      throw error;
+    }
     if (!Array.isArray(payload)) {
       throw new Error('Banco Central retornou JSON inválido');
     }
@@ -891,7 +905,10 @@ const fetchBcbChunk = async (series, start, end) => {
   } catch (error) {
     const status = error.status
       || (error.name === 'TimeoutError' || error.name === 'AbortError' ? 'TIMEOUT' : 'SEM_STATUS');
-    console.error(`Erro na API externa: ${status} ${error.message || 'Falha na requisição ao Banco Central.'}`);
+    console.error(
+      `Erro na API externa: ${status} ${error.message || 'Falha na requisição ao Banco Central.'}`,
+      error.responseBody || ''
+    );
     throw error;
   }
 };
@@ -1521,6 +1538,36 @@ const handleCoinGeckoRequest = async (request, response) => {
     });
   };
 
+  const handleUpdateExchangeRatesCache = async (request, response) => {
+    if (!requireAuth(request)) {
+      sendJson(response, 401, { error: 'Autenticação necessária.' });
+      return;
+    }
+
+    let rates;
+    try {
+      rates = await readJsonBody(request);
+    } catch (error) {
+      sendJson(response, 400, { error: error.message });
+      return;
+    }
+
+    const isValidRate = (rate) => Number.isFinite(Number(rate?.bid))
+      && Number(rate.bid) > 0;
+    if (!isValidRate(rates?.USDBRL) || !isValidRate(rates?.EURBRL)) {
+      sendJson(response, 400, { error: 'Dados de câmbio inválidos.' });
+      return;
+    }
+
+    try {
+      await setMarketCache('exchange-rates', rates);
+      sendJson(response, 200, { success: true });
+    } catch (error) {
+      console.error('[market-cache] Falha ao salvar câmbio enviado pelo navegador:', error);
+      sendJson(response, 500, { error: 'Não foi possível salvar o cache de câmbio.' });
+    }
+  };
+
   const server = createServer((request, response) => {
   if (isProduction && !request.url?.startsWith('/api')) {
     serveProductionFile(request, response);
@@ -1539,6 +1586,11 @@ const handleCoinGeckoRequest = async (request, response) => {
 
   if (request.method === 'GET' && request.url?.split('?')[0] === '/api/exchange-rates') {
     handleExchangeRatesRequest(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && request.url === '/api/exchange-rates/update') {
+    handleUpdateExchangeRatesCache(request, response);
     return;
   }
 

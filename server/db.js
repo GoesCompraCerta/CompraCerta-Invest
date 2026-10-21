@@ -27,6 +27,18 @@ const isTransientDbError = (error) =>
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+const withMarketCacheRetry = async (operation) => {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!isTransientDbError(error) || attempt === 3) throw error;
+      console.warn(`[db] Erro transitório ${error.code}; nova tentativa em 1000ms (${attempt}/3).`);
+      await wait(1000);
+    }
+  }
+};
+
 const migrateSqliteData = async () => {
   const [migrations] = await db.execute(
     'SELECT name FROM schema_migrations WHERE name = ?',
@@ -472,22 +484,24 @@ export const deleteAssetById = async (assetId) => {
 };
 
 export const getMarketCache = async (key) => {
-  const [rows] = await db.execute(`
-    SELECT valor,
-      TIMESTAMPDIFF(SECOND, updated_at, CURRENT_TIMESTAMP) AS age_seconds
-    FROM market_cache
-    WHERE chave = ?
-  `, [key]);
-  if (!rows[0]) return null;
+  return withMarketCacheRetry(async () => {
+    const [rows] = await db.execute(`
+      SELECT valor,
+        TIMESTAMPDIFF(SECOND, updated_at, CURRENT_TIMESTAMP) AS age_seconds
+      FROM market_cache
+      WHERE chave = ?
+    `, [key]);
+    if (!rows[0]) return null;
 
-  try {
-    return {
-      value: JSON.parse(rows[0].valor),
-      ageSeconds: Number(rows[0].age_seconds)
-    };
-  } catch {
-    return null;
-  }
+    try {
+      return {
+        value: JSON.parse(rows[0].valor),
+        ageSeconds: Number(rows[0].age_seconds)
+      };
+    } catch {
+      return null;
+    }
+  });
 };
 
 export const setMarketCache = async (key, value) => {
@@ -496,12 +510,12 @@ export const setMarketCache = async (key, value) => {
     : Array.isArray(value?.data) && value.data.length === 0;
   if (value == null || hasEmptyArray) return;
 
-  await db.execute(`
-    INSERT INTO market_cache (chave, valor, updated_at)
-    VALUES (?, ?, CURRENT_TIMESTAMP)
-    ON DUPLICATE KEY UPDATE
-      valor = VALUES(valor), updated_at = CURRENT_TIMESTAMP
-  `, [key, JSON.stringify(value)]);
+  await withMarketCacheRetry(() => db.execute(`
+      INSERT INTO market_cache (chave, valor, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON DUPLICATE KEY UPDATE
+        valor = VALUES(valor), updated_at = CURRENT_TIMESTAMP
+    `, [key, JSON.stringify(value)]));
 };
 
 const getProventoAssetId = async (userId, ticker) => {

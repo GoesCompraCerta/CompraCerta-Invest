@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { DollarSign, RefreshCw } from 'lucide-react';
+import { getToken } from '../../services/authService.js';
 
-const CACHE_DURATION = 60 * 60 * 1000;
 const EMPTY_RATES = {
   USD: { bid: 0, pctChange: 0 },
   EUR: { bid: 0, pctChange: 0 }
 };
 
 let cachedRates = null;
-let cacheTimestamp = 0;
 let cachedRatesEstimated = false;
 
 const formatCurrency = (value, locale) => Number(value || 0).toLocaleString(locale, {
@@ -29,24 +28,19 @@ export default function CurrencyWidget({ t, lang }) {
   const [isEstimated, setIsEstimated] = useState(cachedRatesEstimated);
 
   const fetchExchangeRates = useCallback(async (forceRefresh = false) => {
-    const now = Date.now();
-
-    if (!forceRefresh && cachedRates && now - cacheTimestamp < CACHE_DURATION) {
-      setRates(cachedRates);
-      setIsEstimated(cachedRatesEstimated);
-      return;
-    }
-
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(
-        `/api/exchange-rates${forceRefresh ? '?refresh=1' : ''}`
-      );
+      const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL', {
+        headers: { Accept: 'application/json' }
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data = await response.json();
+      if (!data?.USDBRL?.bid || !data?.EURBRL?.bid) {
+        throw new Error('A AwesomeAPI retornou cotações inválidas.');
+      }
       const nextRates = {
         USD: {
           bid: Number(data.USDBRL?.bid) || 0,
@@ -59,8 +53,7 @@ export default function CurrencyWidget({ t, lang }) {
       };
 
       cachedRates = nextRates;
-      cachedRatesEstimated = Boolean(data._fallback);
-      cacheTimestamp = now;
+  cachedRatesEstimated = false;
       setRates(nextRates);
       setIsEstimated(cachedRatesEstimated);
       setLastUpdate(new Date().toLocaleTimeString(lang === 'en' ? 'en-US' : 'pt-BR', {
@@ -68,9 +61,55 @@ export default function CurrencyWidget({ t, lang }) {
         minute: '2-digit',
         second: '2-digit'
       }));
+
+      const token = getToken();
+      if (token) {
+        try {
+          const cacheResponse = await fetch('/api/exchange-rates/update', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+          });
+          if (!cacheResponse.ok) {
+            console.warn('Não foi possível salvar as cotações no backend.');
+          }
+        } catch (cacheError) {
+          console.warn('Não foi possível salvar as cotações no backend:', cacheError);
+        }
+      }
     } catch (requestError) {
-      console.error('Exchange rate lookup failed:', requestError);
-      setError(t.exchangeUnavailable);
+      try {
+        const response = await fetch('/api/exchange-rates');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        const nextRates = {
+          USD: {
+            bid: Number(data.USDBRL?.bid) || 0,
+            pctChange: Number(data.USDBRL?.pctChange) || 0
+          },
+          EUR: {
+            bid: Number(data.EURBRL?.bid) || 0,
+            pctChange: Number(data.EURBRL?.pctChange) || 0
+          }
+        };
+        cachedRates = nextRates;
+        cachedRatesEstimated = Boolean(data._fallback);
+        setRates(nextRates);
+        setIsEstimated(cachedRatesEstimated);
+        setLastUpdate(new Date().toLocaleTimeString(lang === 'en' ? 'en-US' : 'pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }));
+      } catch (fallbackError) {
+        console.error('Exchange rate lookup failed:', requestError, fallbackError);
+        setError(t.exchangeUnavailable);
+      }
     } finally {
       setLoading(false);
     }
