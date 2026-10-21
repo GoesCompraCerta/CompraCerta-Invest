@@ -23,9 +23,6 @@ const SERIES = [
 const STORAGE_KEY = 'benchmark_last_result';
 const CACHE_VERSION = 7;
 const BROWSER_CACHE_TTL_MS = 60 * 60 * 1000;
-const BCB_BROWSER_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
-const BCB_BROWSER_SERIES = ['12', '196', '433'];
-const bcbBrowserCache = new Map();
 const normalizeAssets = (assets) => Array.isArray(assets) ? assets : [];
 const readCurrentAssets = (providedAssets) => {
   const currentAssets = normalizeAssets(providedAssets);
@@ -73,54 +70,6 @@ const formatData = (serie = []) => {
     poupanca: rebase(point.poupanca, baselines.poupanca),
     ipca: rebase(point.ipca, baselines.ipca),
     ibovespa: point.ibovespa ?? null
-  }));
-};
-
-const updateBcbCacheFromBrowser = async (months) => {
-  const token = getToken();
-  if (!token) return;
-
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, 1));
-  const startDate = start.toISOString().slice(0, 10);
-  const endDate = now.toISOString().slice(0, 10);
-  const toBcbDate = (isoDate) => {
-    const [year, month, day] = isoDate.split('-');
-    return `${day}/${month}/${year}`;
-  };
-
-  await Promise.all(BCB_BROWSER_SERIES.map(async (series) => {
-    const cacheKey = `${series}:${startDate}:${endDate}`;
-    const cached = bcbBrowserCache.get(cacheKey);
-    if (cached && Date.now() - cached.fetchedAt < BCB_BROWSER_CACHE_TTL_MS) return;
-
-    try {
-      const url = new URL(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${series}/dados`);
-      url.searchParams.set('formato', 'json');
-      url.searchParams.set('dataInicial', toBcbDate(startDate));
-      url.searchParams.set('dataFinal', toBcbDate(endDate));
-
-      const response = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error(`BCB HTTP ${response.status}`);
-      const data = await response.json();
-      if (!Array.isArray(data) || data.length === 0) {
-        throw new Error('BCB retornou uma série vazia ou inválida.');
-      }
-
-      const saveResponse = await fetch('/api/bcb/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ series, startDate, endDate, data })
-      });
-      if (!saveResponse.ok) throw new Error(`Falha ao salvar série BCB: HTTP ${saveResponse.status}`);
-      bcbBrowserCache.set(cacheKey, { data, fetchedAt: Date.now() });
-    } catch (error) {
-      console.warn(`[benchmark] Não foi possível atualizar a série BCB ${series} no navegador:`, error);
-    }
   }));
 };
 
@@ -176,7 +125,6 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
 
     try {
       const portfolioHash = await getPortfolioHash(assets, months);
-      await updateBcbCacheFromBrowser(months);
       const token = getToken();
       const response = await fetch('/api/portfolio/evolution', {
         method: 'POST',

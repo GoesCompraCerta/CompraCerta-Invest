@@ -12,7 +12,6 @@ import {
   createProvento,
   createPasswordReset,
   createUser,
-  db,
   deleteAssetById,
   deleteProventoById,
   deleteUserAndAssets,
