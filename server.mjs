@@ -317,34 +317,6 @@ const handleAuthMe = async (request, response) => {
   sendJson(response, 200, { user: toPublicUser(user) });
 };
 
-const handleAuthExportData = async (request, response) => {
-  const userId = requireAuth(request);
-  if (!userId) {
-    sendJson(response, 401, { error: 'Autenticação necessária.' });
-    return;
-  }
-
-  const user = await getUserById(userId);
-  if (!user) {
-    sendJson(response, 401, { error: 'Usuário não encontrado.' });
-    return;
-  }
-
-  const assets = await getAssetsByUserId(userId);
-  sendJson(response, 200, {
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      created_at: user.created_at,
-      plan: user.plan,
-      plan_expires_at: user.plan_expires_at
-    },
-    assets,
-    exportedAt: new Date().toISOString()
-  });
-};
-
 const handleAuthDeleteAccount = async (request, response) => {
   const userId = requireAuth(request);
   if (!userId) {
@@ -1731,11 +1703,6 @@ const handleCoinGeckoRequest = async (request, response) => {
 
   if (request.method === 'GET' && request.url === '/api/auth/me') {
     handleAuthMe(request, response);
-    return;
-  }
-
-  if (request.method === 'GET' && request.url === '/api/auth/export-data') {
-    handleAuthExportData(request, response);
     return;
   }
 

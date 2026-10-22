@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import AssetForm from '../components/Forms/AssetForm';
 import AssetsTable from '../components/Portfolio/AssetsTable';
-import { exportPortfolioToExcel } from '../services/calculationService';
 import { isCrypto } from '../utils/cryptoUtils';
 import { fetchExchangeRates } from '../services/assetService';
 import { normalizeAssetType } from '../constants/config';
@@ -346,11 +345,6 @@ export default function PortfolioPage({
     });
   };
 
-  const handleExportExcel = async () => {
-    if (totals.list.length === 0 && (!proventos || proventos.length === 0)) return;
-    await exportPortfolioToExcel(totals.list, proventos, t);
-  };
-
   return (
     <div className="space-y-6">
       <div className={`p-6 rounded-2xl border space-y-4 ${cardClass}`}>
@@ -381,7 +375,6 @@ export default function PortfolioPage({
         onDelete={onDeleteAsset}
         onUpdateQuote={(item) => onUpdateQuote(item, onUpdateAsset)}
         updatingAssetId={updatingAssetId}
-        onExport={handleExportExcel}
       />
       {updateMsg && (
         <p className={`text-xs font-bold ${updateMsg.startsWith('✓') ? 'text-emerald-400' : 'text-rose-400'}`}>

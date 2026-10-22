@@ -23,8 +23,6 @@ const request = async (path, options = {}) => {
   return payload;
 };
 
-export const exportData = () => request('/api/auth/export-data');
-
 export const deleteAccount = (password) => request('/api/auth/delete-account', {
   method: 'DELETE',
   body: JSON.stringify({ password })

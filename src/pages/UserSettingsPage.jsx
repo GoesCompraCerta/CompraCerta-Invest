@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Check, Download, ExternalLink, Eye, EyeOff, Moon, Sun, Trash2 } from 'lucide-react';
 import { activateProForTest } from '../services/authService';
-import { deleteAccount, exportData } from '../services/lgpdService';
+import { deleteAccount } from '../services/lgpdService';
+import { exportPortfolioToExcel } from '../services/calculationService';
 import { brapiApiKeyStorage, coinGeckoApiKeyStorage } from '../services/storageService';
 import DeleteAccountModal from '../components/Common/DeleteAccountModal';
 
@@ -11,6 +12,8 @@ const PLAN_LINKS = {
 };
 
 export default function UserSettingsPage({
+  assets,
+  proventos,
   t,
   planStatus,
   setPlanStatus,
@@ -30,8 +33,8 @@ export default function UserSettingsPage({
   const [isActivatingTestPlan, setIsActivatingTestPlan] = useState(false);
   const [showBrapiApiKey, setShowBrapiApiKey] = useState(false);
   const [showCoinGeckoApiKey, setShowCoinGeckoApiKey] = useState(false);
-  const [isDownloadingData, setIsDownloadingData] = useState(false);
-  const [dataExportError, setDataExportError] = useState('');
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [excelExportError, setExcelExportError] = useState('');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState('');
@@ -61,24 +64,15 @@ export default function UserSettingsPage({
     }
   };
 
-  const handleExportData = async () => {
-    setIsDownloadingData(true);
-    setDataExportError('');
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true);
+    setExcelExportError('');
     try {
-      const payload = await exportData();
-      const file = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const downloadUrl = URL.createObjectURL(file);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = `meus-dados-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(downloadUrl);
+      await exportPortfolioToExcel(assets, proventos, t);
     } catch {
-      setDataExportError(t.dataDownloadError);
+      setExcelExportError(t.excelExportError);
     } finally {
-      setIsDownloadingData(false);
+      setIsExportingExcel(false);
     }
   };
 
@@ -202,16 +196,16 @@ export default function UserSettingsPage({
             <div>
               <p className="font-bold">{t.myDataTitle}</p>
               <p className={`mt-1 text-sm ${mutedClass}`}>{t.myDataSubtitle}</p>
-              {dataExportError && <p className="mt-2 text-sm text-rose-500" role="alert">{dataExportError}</p>}
+              {excelExportError && <p className="mt-2 text-sm text-rose-500" role="alert">{excelExportError}</p>}
             </div>
             <button
               type="button"
-              onClick={handleExportData}
-              disabled={isDownloadingData}
+              onClick={handleExportExcel}
+              disabled={isExportingExcel}
               className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 ${themeStyle.btn}`}
             >
               <Download className="h-4 w-4" aria-hidden="true" />
-              {isDownloadingData ? t.dataDownloading : t.downloadMyData}
+              {isExportingExcel ? t.excelExporting : t.exportMyDataExcel}
             </button>
           </div>
 

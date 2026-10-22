@@ -78,7 +78,7 @@ export default function PrivacyPolicyPage({
               <li><strong>Confirmação e Acesso:</strong> Saber se tratamos seus dados e solicitar cópia deles.</li>
               <li><strong>Correção:</strong> Solicitar a correção de dados incompletos, inexatos ou desatualizados.</li>
               <li><strong>Anonimização, Bloqueio ou Eliminação:</strong> Aplicável a dados desnecessários ou tratados em desconformidade com a LGPD.</li>
-              <li><strong>Portabilidade:</strong> Requisitar a transferência dos seus dados para outro fornecedor de serviço, quando aplicável. Como o CompraCerta-Invest é uma ferramenta de acompanhamento, a portabilidade pode ser exercida pelo download dos seus dados em formato JSON, disponível nas configurações do sistema.</li>
+              <li><strong>Portabilidade:</strong> Requisitar a transferência dos seus dados para outro fornecedor de serviço, quando aplicável. Como o CompraCerta-Invest é uma ferramenta de acompanhamento, essa solicitação pode ser feita pelos canais de contato indicados abaixo.</li>
               <li><strong>Revogação do Consentimento:</strong> Retirar a autorização para o tratamento de dados a qualquer momento.</li>
             </ul>
             <p>Para exercer qualquer um desses direitos, entre em contato conosco através do e-mail: <a className="font-semibold text-emerald-500" href="mailto:goescompracerta@hotmail.com">goescompracerta@hotmail.com</a></p>
@@ -157,7 +157,7 @@ export default function PrivacyPolicyPage({
               <li><strong>Confirmation and Access:</strong> Ask whether we process your data and request a copy.</li>
               <li><strong>Correction:</strong> Request correction of incomplete, inaccurate, or outdated data.</li>
               <li><strong>Anonymization, Blocking, or Deletion:</strong> For unnecessary data or data processed in violation of the LGPD.</li>
-              <li><strong>Portability:</strong> Request the transfer of your data to another service provider, where applicable. As CompraCerta-Invest is a tracking tool, portability may be exercised by downloading your data in JSON format, available in the system settings.</li>
+              <li><strong>Portability:</strong> Request the transfer of your data to another service provider, where applicable. As CompraCerta-Invest is a tracking tool, such a request may be made through the contact channels listed below.</li>
               <li><strong>Withdrawal of Consent:</strong> Withdraw consent to data processing at any time.</li>
             </ul>
             <p>To exercise any of these rights, contact us at: <a className="font-semibold text-emerald-500" href="mailto:goescompracerta@hotmail.com">goescompracerta@hotmail.com</a></p>

@@ -454,6 +454,8 @@ export default function App() {
 
         {activeTab === 'configuracoes' && (
           <UserSettingsPage
+            assets={totals.list}
+            proventos={proventos}
             t={t}
             planStatus={planStatus}
             setPlanStatus={setPlanStatus}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit3, Trash2, Download, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Edit3, Trash2, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { normalizeFiiDyPeriod } from '../../services/calculationService';
 import { ASSET_TYPE_TRANSLATION_KEYS } from '../../constants/translations';
 
@@ -162,8 +162,7 @@ export default function AssetsTable({
   onEdit,
   onDelete,
   onUpdateQuote,
-  updatingAssetId,
-  onExport
+  updatingAssetId
 }) {
   const assetList = Array.isArray(assets) ? assets : [];
   const [expandedAssetId, setExpandedAssetId] = React.useState(null);
@@ -176,12 +175,6 @@ export default function AssetsTable({
     <div className={`rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/40 ${cardClass}`}>
       <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-3">
         <h3 className="font-bold text-sm text-slate-100">{t.ativosCadastrados}</h3>
-        <button
-          onClick={onExport}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold text-slate-300 hover:bg-slate-800 transition-colors"
-        >
-          <Download className="w-3.5 h-3.5" /> {t.exportarExcel}
-        </button>
       </div>
 
       <div className="max-h-[500px] overflow-auto">
