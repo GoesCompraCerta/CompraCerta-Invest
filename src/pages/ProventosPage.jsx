@@ -38,6 +38,7 @@ export default function ProventosPage({
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [summaryFailed, setSummaryFailed] = useState(false);
   const [summaryAttempt, setSummaryAttempt] = useState(0);
+  const [chartPeriod, setChartPeriod] = useState('all');
   const [formData, setFormData] = useState({
     ticker: '',
     value: '',
@@ -63,10 +64,37 @@ export default function ProventosPage({
     return () => { isActive = false; };
   }, [proventos, summaryAttempt, onSessionExpired]);
 
-  const chartData = summary.evolucaoMensal.map(({ mes, total }) => ({
+  const monthlyData = summary.evolucaoMensal.map(({ mes, total }) => ({
     mes,
-    total: privacyMode ? null : Number(total)
+    total: Number(total)
   }));
+  const monthsToShow = chartPeriod === '6m' ? 6 : chartPeriod === '1y' ? 12 : null;
+  const now = new Date();
+  const currentMonthIndex = now.getFullYear() * 12 + now.getMonth();
+  const filteredMonthlyData = monthsToShow
+    ? monthlyData.filter(({ mes }) => {
+        const [year, month] = mes.split('-').map(Number);
+        const monthIndex = year * 12 + month - 1;
+        return monthIndex >= currentMonthIndex - monthsToShow + 1
+          && monthIndex <= currentMonthIndex;
+      })
+    : monthlyData;
+  const chartGranularity = chartPeriod === 'all' && monthlyData.length > 24
+    ? 'year'
+    : 'month';
+  const chartData = chartGranularity === 'year'
+    ? Array.from(
+        monthlyData.reduce((totalsByYear, { mes, total }) => {
+          const year = mes.slice(0, 4);
+          totalsByYear.set(year, (totalsByYear.get(year) || 0) + total);
+          return totalsByYear;
+        }, new Map()),
+        ([mes, total]) => ({ mes, total: privacyMode ? null : total })
+      )
+    : filteredMonthlyData.map(({ mes, total }) => ({
+        mes,
+        total: privacyMode ? null : total
+      }));
   const formatMonth = (value) => {
     const [year, month] = String(value).split('-').map(Number);
     return new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'pt-BR', {
@@ -75,6 +103,9 @@ export default function ProventosPage({
       timeZone: 'UTC'
     }).format(new Date(Date.UTC(year, month - 1, 1)));
   };
+  const formatChartLabel = (value) => (
+    chartGranularity === 'year' ? String(value) : formatMonth(value)
+  );
 
   const handleSaveProvento = (e) => {
     e.preventDefault();
@@ -116,7 +147,30 @@ export default function ProventosPage({
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section className={`min-w-0 rounded-xl border p-5 lg:col-span-2 ${cardClass}`}>
-          <h3 className="mb-4 text-sm font-bold">{t.evolucaoMensalProventos}</h3>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-bold">{t.evolucaoMensalProventos}</h3>
+            <div className="flex rounded-lg border border-current/15 p-1" role="group" aria-label={t.filtroPeriodoGrafico}>
+              {[
+                ['6m', t.ultimos6Meses],
+                ['1y', t.ultimoAno],
+                ['all', t.todoPeriodo]
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={chartPeriod === value}
+                  onClick={() => setChartPeriod(value)}
+                  className={`flex w-12 flex-none items-center justify-center rounded-md px-2.5 py-1 text-center text-xs font-semibold ${
+                    chartPeriod === value
+                      ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-600'
+                      : 'text-slate-400 hover:text-current'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           {summaryFailed ? (
             <div className={`flex h-[260px] items-center justify-center text-center text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               <div>
@@ -137,7 +191,7 @@ export default function ProventosPage({
                   <CartesianGrid stroke="currentColor" strokeOpacity={0.15} vertical={false} />
                   <XAxis
                     dataKey="mes"
-                    tickFormatter={formatMonth}
+                    tickFormatter={formatChartLabel}
                     stroke="currentColor"
                     tick={{ fill: 'currentColor', fontSize: 11 }}
                     tickLine={false}
@@ -151,13 +205,17 @@ export default function ProventosPage({
                     tickFormatter={(value) => privacyMode ? '***' : formatMoney(value)}
                   />
                   <Tooltip
-                    labelFormatter={formatMonth}
+                    cursor={false}
+                    labelFormatter={formatChartLabel}
                     formatter={(value) => [privacyMode ? 'R$ ***' : formatMoney(value), t.totalRecebidoResumo]}
                     contentStyle={{
-                      background: 'var(--bg-card, inherit)',
-                      color: 'var(--text-primary, currentColor)',
+                      backgroundColor: '#1a1a1a',
+                      color: '#ffffff',
+                      border: '1px solid #374151',
                       borderRadius: 8
                     }}
+                    labelStyle={{ color: '#ffffff' }}
+                    itemStyle={{ color: '#ffffff' }}
                   />
                   <Bar dataKey="total" name={t.totalRecebidoResumo} fill="currentColor" radius={[4, 4, 0, 0]} maxBarSize={44} />
                 </BarChart>
