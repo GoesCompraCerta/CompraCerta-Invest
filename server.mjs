@@ -20,6 +20,7 @@ import {
   getMarketCache,
   getProventoById,
   getProventosByUserId,
+  getProventosSummaryByUserId,
   getUserByEmail,
   getUserById,
   initDb,
@@ -779,6 +780,54 @@ const handleListProventos = async (request, response) => {
   const userId = await requireActivePlan(request, response);
   if (!userId) return;
   sendJson(response, 200, (await getProventosByUserId(userId)).map(toPublicProvento));
+};
+
+const handleProventosResumo = async (request, response) => {
+  const userId = await requireActivePlan(request, response);
+  if (!userId) return;
+
+  try {
+    const summary = await getProventosSummaryByUserId(userId);
+    const assets = await getAssetsByUserId(userId);
+    const investedByTicker = new Map();
+
+    for (const asset of assets) {
+      const ticker = String(asset.ticker || '').toUpperCase();
+      const cost = calculateAssetInvested({
+        quantity: asset.qty,
+        averageUnitPrice: asset.buy_price,
+        type: asset.type,
+        ticker
+      });
+      investedByTicker.set(ticker, (investedByTicker.get(ticker) || 0) + cost);
+    }
+
+    sendJson(response, 200, {
+      evolucaoMensal: summary.evolucaoMensal.map((row) => ({
+        mes: row.mes,
+        total: Number(row.total)
+      })),
+      resumoAtivos: summary.resumoAtivos.map((row) => {
+        const totalRecebido = Number(row.total_recebido);
+        const custo = investedByTicker.get(String(row.ticker).toUpperCase()) || 0;
+        return {
+          ticker: row.ticker,
+          total_recebido: totalRecebido,
+          yield_on_cost: custo > 0
+            ? Number(((totalRecebido / custo) * 100).toFixed(2))
+            : null
+        };
+      })
+    });
+  } catch (error) {
+    console.error('[proventos/resumo] Erro ao consultar resumo:', {
+      code: error.code,
+      sqlMessage: error.sqlMessage,
+      sqlState: error.sqlState,
+      message: error.message
+    });
+    sendJson(response, 500, { error: 'Não foi possível carregar o resumo de proventos.' });
+  }
 };
 
 const handleCreateProvento = async (request, response) => {
@@ -1615,6 +1664,11 @@ const handleCoinGeckoRequest = async (request, response) => {
 
   if (request.method === 'POST' && request.url === '/api/proventos') {
     handleCreateProvento(request, response);
+    return;
+  }
+
+  if (request.method === 'GET' && request.url === '/api/proventos/resumo') {
+    handleProventosResumo(request, response);
     return;
   }
 

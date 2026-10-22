@@ -48,7 +48,7 @@ export default function RebalancerPage({
   const assets = storedAssets.length > 0 ? storedAssets : (totals.list || []);
   const aporte = Number(novoAporte) || 0;
   const patrimonioTotal = assets.reduce((total, asset) => total + getAssetValue(asset), 0);
-  const patrimonioFuturo = patrimonioTotal + aporte;
+  const patrimonioFuturo = aporte > 0 ? patrimonioTotal + aporte : 0;
 
   const resultadoAporte = useMemo(() => {
     const base = calculateStaticRebalance({

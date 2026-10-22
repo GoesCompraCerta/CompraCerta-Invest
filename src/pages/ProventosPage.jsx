@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Edit3, Trash2 } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { getProventosSummary } from '../services/proventosService';
+
+const EMPTY_SUMMARY = { evolucaoMensal: [], resumoAtivos: [] };
 
 const formatDateInput = (value) => {
   const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
@@ -21,18 +25,56 @@ export default function ProventosPage({
   formatMoney,
   themeStyle,
   cardClass,
+  isDarkMode,
+  privacyMode,
+  lang,
   t,
+  onSessionExpired,
   onAddProvento,
   onUpdateProvento,
   onDeleteProvento
 }) {
   const [editingProvId, setEditingProvId] = useState(null);
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
+  const [summaryFailed, setSummaryFailed] = useState(false);
+  const [summaryAttempt, setSummaryAttempt] = useState(0);
   const [formData, setFormData] = useState({
     ticker: '',
     value: '',
     type: 'Dividendos',
     date: ''
   });
+
+  useEffect(() => {
+    let isActive = true;
+    setSummaryFailed(false);
+    getProventosSummary()
+      .then((result) => {
+        if (isActive) setSummary(result);
+      })
+      .catch((error) => {
+        console.error('Proventos summary request failed:', error);
+        if (isActive) {
+          setSummary(EMPTY_SUMMARY);
+          setSummaryFailed(true);
+          if (error.status === 401) onSessionExpired();
+        }
+      });
+    return () => { isActive = false; };
+  }, [proventos, summaryAttempt, onSessionExpired]);
+
+  const chartData = summary.evolucaoMensal.map(({ mes, total }) => ({
+    mes,
+    total: privacyMode ? null : Number(total)
+  }));
+  const formatMonth = (value) => {
+    const [year, month] = String(value).split('-').map(Number);
+    return new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'pt-BR', {
+      month: 'short',
+      year: '2-digit',
+      timeZone: 'UTC'
+    }).format(new Date(Date.UTC(year, month - 1, 1)));
+  };
 
   const handleSaveProvento = (e) => {
     e.preventDefault();
@@ -72,6 +114,106 @@ export default function ProventosPage({
 
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <section className={`min-w-0 rounded-xl border p-5 lg:col-span-2 ${cardClass}`}>
+          <h3 className="mb-4 text-sm font-bold">{t.evolucaoMensalProventos}</h3>
+          {summaryFailed ? (
+            <div className={`flex h-[260px] items-center justify-center text-center text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              <div>
+                <p>{t.erroResumoProventos}</p>
+                <button type="button" className="mt-2 underline" onClick={() => setSummaryAttempt((attempt) => attempt + 1)}>
+                  {t.tentarNovamente}
+                </button>
+              </div>
+            </div>
+          ) : chartData.length === 0 ? (
+            <div className={`flex h-[260px] items-center justify-center text-center text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              {t.semProventosResumo}
+            </div>
+          ) : (
+            <div className={`relative h-[260px] w-full min-w-0 ${themeStyle.text}`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+                  <CartesianGrid stroke="currentColor" strokeOpacity={0.15} vertical={false} />
+                  <XAxis
+                    dataKey="mes"
+                    tickFormatter={formatMonth}
+                    stroke="currentColor"
+                    tick={{ fill: 'currentColor', fontSize: 11 }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    hide={privacyMode}
+                    stroke="currentColor"
+                    tick={{ fill: 'currentColor', fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => privacyMode ? '***' : formatMoney(value)}
+                  />
+                  <Tooltip
+                    labelFormatter={formatMonth}
+                    formatter={(value) => [privacyMode ? 'R$ ***' : formatMoney(value), t.totalRecebidoResumo]}
+                    contentStyle={{
+                      background: 'var(--bg-card, inherit)',
+                      color: 'var(--text-primary, currentColor)',
+                      borderRadius: 8
+                    }}
+                  />
+                  <Bar dataKey="total" name={t.totalRecebidoResumo} fill="currentColor" radius={[4, 4, 0, 0]} maxBarSize={44} />
+                </BarChart>
+              </ResponsiveContainer>
+              {privacyMode && (
+                <div className={`pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  ***
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className={`rounded-xl border p-5 ${cardClass}`}>
+          <h3 className="mb-4 text-sm font-bold">{t.yieldOnCost}</h3>
+          {summaryFailed ? (
+            <p className={`py-8 text-center text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              {t.erroResumoProventos}
+            </p>
+          ) : summary.resumoAtivos.length === 0 ? (
+            <p className={`py-8 text-center text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              {t.semProventosResumo}
+            </p>
+          ) : (
+            <div className="max-h-[260px] overflow-auto">
+              <table className="w-full text-left text-xs">
+                <thead className={`${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <tr className="border-b border-current/15">
+                    <th className="py-2 pr-2 font-semibold">{t.ticker}</th>
+                    <th className="py-2 px-2 text-right font-semibold">{t.totalRecebidoResumo}</th>
+                    <th className="py-2 pl-2 text-right font-semibold">{t.yieldOnCost}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.resumoAtivos.map((item) => (
+                    <tr key={item.ticker} className="border-b border-current/10 last:border-0">
+                      <td className="py-2 pr-2 font-bold">{item.ticker}</td>
+                      <td className="py-2 px-2 text-right whitespace-nowrap">
+                        {privacyMode ? 'R$ ***' : formatMoney(item.total_recebido)}
+                      </td>
+                      <td className={`py-2 pl-2 text-right whitespace-nowrap ${themeStyle.text}`}>
+                        {privacyMode
+                          ? '***'
+                          : item.yield_on_cost == null
+                            ? t.yieldOnCostUnavailable
+                            : `${Number(item.yield_on_cost).toFixed(2)}%`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+
       <div className={`p-6 rounded-2xl border space-y-4 ${cardClass}`}>
         <h3 className="font-bold text-sm">{t.lancarProventos}</h3>
         <form onSubmit={handleSaveProvento} className="grid grid-cols-1 sm:grid-cols-4 gap-3">

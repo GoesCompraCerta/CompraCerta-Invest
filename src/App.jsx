@@ -184,7 +184,7 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await authService.logout();
     } catch {
@@ -196,7 +196,7 @@ export default function App() {
     clearAssets();
     setShowOpeningIntro(false);
     navigateTo('/login');
-  };
+  }, [clearAssets, navigateTo]);
 
   // ── Memoized calculations ────────────────────────────────────────────────
   const totals = useMemo(
@@ -395,7 +395,11 @@ export default function App() {
             formatMoney={formatMoney}
             themeStyle={themeStyle}
             cardClass={cardClass}
+            isDarkMode={isDarkMode}
+            privacyMode={privacyMode}
+            lang={lang}
             t={t}
+            onSessionExpired={handleLogout}
             onAddProvento={addProvento}
             onUpdateProvento={updateProvento}
             onDeleteProvento={deleteProvento}

@@ -35,6 +35,14 @@ export const listProventos = async () => {
   return proventos;
 };
 
+export const getProventosSummary = async () => {
+  const summary = await request('/api/proventos/resumo');
+  if (!Array.isArray(summary?.evolucaoMensal) || !Array.isArray(summary?.resumoAtivos)) {
+    throw new Error('O servidor retornou um resumo de proventos inválido.');
+  }
+  return summary;
+};
+
 export const createProvento = (data) => request('/api/proventos', {
   method: 'POST',
   body: JSON.stringify(data)

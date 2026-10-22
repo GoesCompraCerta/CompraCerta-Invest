@@ -14,6 +14,7 @@ import {
 import {
   createProvento as createProventoRequest,
   deleteProvento as deleteProventoRequest,
+  getProventosSummary,
   listProventos,
   updateProvento as updateProventoRequest
 } from './src/services/proventosService.js';
@@ -741,6 +742,40 @@ addTest(
         && updated.value === 22.75
         && secondRead[0].value === 22.75
         && finalRead.length === 0;
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalLocalStorage === undefined) {
+        delete globalThis.localStorage;
+      } else {
+        globalThis.localStorage = originalLocalStorage;
+      }
+    }
+  }
+);
+
+addTest(
+  'Resumo de proventos retorna evolução mensal e Yield on Cost',
+  {},
+  'GET /api/proventos/resumo devolve os dois arrays com autenticação',
+  async () => {
+    const originalFetch = globalThis.fetch;
+    const originalLocalStorage = globalThis.localStorage;
+    const expected = {
+      evolucaoMensal: [{ mes: '2026-08', total: 6.37 }],
+      resumoAtivos: [{ ticker: 'BROO11', total_recebido: 6.37, yield_on_cost: 15.2 }]
+    };
+
+    globalThis.localStorage = { getItem: () => 'test-token' };
+    globalThis.fetch = async (path, options = {}) => ({
+      ok: path === '/api/proventos/resumo'
+        && options.headers?.Authorization === 'Bearer test-token',
+      json: async () => expected
+    });
+
+    try {
+      const summary = await getProventosSummary();
+      return summary.evolucaoMensal[0]?.total === 6.37
+        && summary.resumoAtivos[0]?.yield_on_cost === 15.2;
     } finally {
       globalThis.fetch = originalFetch;
       if (originalLocalStorage === undefined) {

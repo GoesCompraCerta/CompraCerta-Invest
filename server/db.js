@@ -536,6 +536,27 @@ export const getProventosByUserId = async (userId) => {
   return rows;
 };
 
+export const getProventosSummaryByUserId = async (userId) => {
+  const [[monthlyRows], [tickerRows]] = await Promise.all([
+    db.execute(`
+      SELECT DATE_FORMAT(data, '%Y-%m') AS mes, SUM(valor) AS total
+      FROM proventos
+      WHERE user_id = ?
+      GROUP BY DATE_FORMAT(data, '%Y-%m')
+      ORDER BY mes
+    `, [userId]),
+    db.execute(`
+      SELECT ticker, SUM(valor) AS total_recebido
+      FROM proventos
+      WHERE user_id = ?
+      GROUP BY ticker
+      ORDER BY ticker
+    `, [userId])
+  ]);
+
+  return { evolucaoMensal: monthlyRows, resumoAtivos: tickerRows };
+};
+
 export const getProventoById = async (proventoId, userId) => {
   const [rows] = await db.execute(`
     SELECT id, user_id, asset_id, ticker, tipo, valor, data, created_at
