@@ -58,7 +58,7 @@ const isForeignAsset = (type) => [
   'Ações (EUA / Globais)', 'REITs (EUA / Globais)', 'ETFs (EUA / Globais)'
 ].includes(type);
 
-export default function AssetForm({ onSubmit, editingId, onCancel, formData, onFormChange, onTypeChange, pmAlreadyInBrl, priceAlreadyInBrl, themeStyle, t }) {
+export default function AssetForm({ onSubmit, editingId, onCancel, formData, onFormChange, onFormDirty, isFormDirty, onTypeChange, pmAlreadyInBrl, priceAlreadyInBrl, themeStyle, t }) {
   React.useEffect(() => {
     if (editingId) return;
     const lastAssetType = getLastAssetType();
@@ -67,7 +67,10 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
     }
   }, [editingId, formData.type, onFormChange]);
 
-  const handleChange = (field, value) => onFormChange({ ...formData, [field]: value });
+  const handleChange = (field, value) => {
+    onFormDirty?.();
+    onFormChange({ ...formData, [field]: value });
+  };
   const cryptoAsset = isCrypto(formData.type, formData.ticker);
   const internationalAsset = isForeignAsset(formData.type);
   const displayCurrency = (formData.moeda || 'USD').toUpperCase();
@@ -101,6 +104,7 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
   };
 
   const handleTypeChange = (type) => {
+    onFormDirty?.();
     saveLastAssetType(type);
     const clearedFields = Object.keys(formData).reduce((result, field) => ({ ...result, [field]: '' }), {});
     onFormChange({
@@ -164,7 +168,10 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
               <button
                 key={period}
                 type="button"
-                onClick={() => onFormChange({ ...formData, dyPeriod: period })}
+                onClick={() => {
+                  onFormDirty?.();
+                  onFormChange({ ...formData, dyPeriod: period });
+                }}
                 className={`min-w-[2.1rem] px-1.5 py-0.5 rounded text-[8px] font-black leading-none transition-all ${
                   selectedPeriod === period ? themeStyle.btn : 'text-slate-500'
                 }`}
@@ -261,7 +268,11 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
         <div className="self-end xl:col-start-5">
           <button
             type="submit"
-            className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold ${themeStyle.btn}`}
+            className={`w-full rounded-xl px-3 py-2.5 text-xs font-bold transition-colors ${
+              isFormDirty
+                ? 'bg-emerald-400 text-slate-950 ring-2 ring-emerald-300/40 hover:bg-emerald-300'
+                : themeStyle.btn
+            }`}
           >
             {editingId ? t.salvar : t.adicionar}
           </button>

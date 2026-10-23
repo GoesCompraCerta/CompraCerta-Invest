@@ -22,6 +22,13 @@ const formatPercent = (value, digits = 2) => {
   const number = Number(String(value).replace('%', '').replace(',', '.'));
   return Number.isFinite(number) ? `${number.toFixed(digits)}%` : '-';
 };
+const formatAssetMeta = (item) => {
+  const value = item.metaPercent === undefined || item.metaPercent === null || item.metaPercent === ''
+    ? item.meta
+    : item.metaPercent;
+  const numericValue = Number(String(value ?? 0).replace('%', '').replace(',', '.'));
+  return Number.isFinite(numericValue) ? `${Number(numericValue.toFixed(2))}%` : '-';
+};
 
 const formatCompactCurrency = (value, t, lang) => {
   if (value === null || value === undefined || value === '') return '-';
@@ -181,7 +188,6 @@ export default function AssetsTable({
       <div className="space-y-3 p-3 md:hidden">
         {assetList.length > 0 ? assetList.map((item) => {
           const isExpanded = expandedAssetId === item.id;
-          const metaPercent = item.metaPercent ?? item.meta ?? 0;
           const assetTypeLabel = t[ASSET_TYPE_TRANSLATION_KEYS[item.type]] || item.type || '-';
           const fields = [
             [t.qtd, item.qty],
@@ -190,7 +196,7 @@ export default function AssetsTable({
             [t.cotacao, formatMoney(item.price)],
             [t.valorTotal, formatMoney(item.valorTotal)],
             [t.pctAtual, formatMetric(item.pctAtual, '%')],
-            [t.meta, `${metaPercent}%`]
+            [t.meta, formatAssetMeta(item)]
           ];
 
           return (
@@ -288,7 +294,7 @@ export default function AssetsTable({
             {assetList.length > 0 ? (
               assetList.map((item) => {
                 const isExpanded = expandedAssetId === item.id;
-                const metaPercent = item.metaPercent ?? item.meta ?? 0;
+                const metaPercent = formatAssetMeta(item);
                 const assetTypeLabel = t[ASSET_TYPE_TRANSLATION_KEYS[item.type]] || item.type || '-';
 
                 return (
@@ -326,7 +332,7 @@ export default function AssetsTable({
                         {formatMetric(item.pctAtual, '%')}
                       </td>
                       <td className="p-2.5 text-center text-slate-300">
-                        {metaPercent}%
+                        {metaPercent}
                       </td>
                       <td className="p-2.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">

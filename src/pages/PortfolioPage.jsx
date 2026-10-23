@@ -52,6 +52,7 @@ export default function PortfolioPage({
   updateMsg
 }) {
   const [editingAssetId, setEditingAssetId] = useState(null);
+  const [isFormDirty, setIsFormDirty] = useState(false);
   const [pmAlreadyInBrl, setPmAlreadyInBrl] = useState(false);
   const [priceAlreadyInBrl, setPriceAlreadyInBrl] = useState(false);
   const [formData, setFormData] = useState({
@@ -195,6 +196,7 @@ export default function PortfolioPage({
       if (!createdAsset) return;
     }
 
+    setIsFormDirty(false);
     setPriceAlreadyInBrl(false);
     setPmAlreadyInBrl(false);
 
@@ -235,6 +237,7 @@ export default function PortfolioPage({
   };
 
   const handleEditAsset = async (item) => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     const normalizedType = normalizeAssetType(item.type);
     const international = isForeignAsset(normalizedType);
     let editPm = item.pm;
@@ -257,6 +260,7 @@ export default function PortfolioPage({
     }
 
     setEditingAssetId(item.id);
+  setIsFormDirty(true);
     setPmAlreadyInBrl(!international && !item.pmOriginal && (item.pmCurrency || item.moedaOriginal) === 'BRL');
     setPriceAlreadyInBrl(!international && !item.priceOriginal && item.priceCurrency === 'BRL');
     setFormData({
@@ -308,6 +312,7 @@ export default function PortfolioPage({
 
   const handleCancel = () => {
     setEditingAssetId(null);
+    setIsFormDirty(false);
     setPmAlreadyInBrl(false);
     setPriceAlreadyInBrl(false);
     setFormData({
@@ -355,6 +360,8 @@ export default function PortfolioPage({
           onCancel={handleCancel}
           formData={formData}
           onFormChange={setFormData}
+          isFormDirty={isFormDirty}
+          onFormDirty={() => setIsFormDirty(true)}
           onTypeChange={handleAssetTypeChange}
           pmAlreadyInBrl={pmAlreadyInBrl}
           priceAlreadyInBrl={priceAlreadyInBrl}
