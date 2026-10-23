@@ -46,7 +46,7 @@ export default function PortfolioChart({
   );
 
   return (
-    <div className={`card-ativo-alocacao lg:col-span-2 p-6 rounded-2xl border space-y-4 ${cardClass}`}>
+    <div className={`card-ativo-alocacao lg:col-span-2 rounded-2xl border p-4 md:p-6 space-y-4 ${cardClass}`}>
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-sm">{t.alocacaoCarteira}</h3>
         <div className="controle-rosca tamanho-rosca-container flex items-center gap-1 bg-slate-900/40 p-1 rounded-lg border border-slate-800">
@@ -70,7 +70,7 @@ export default function PortfolioChart({
       </div>
 
       {/* Fixed-height wrapper */}
-      <div style={{ width: '100%', height: 288 }} className="relative">
+      <div className="relative h-64 w-full md:h-72">
         {sortedAssets.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>

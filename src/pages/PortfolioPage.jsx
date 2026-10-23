@@ -35,6 +35,7 @@ const isForeignAsset = (type) => [
 
 export default function PortfolioPage({
   totals,
+  isDarkMode,
   formatMoney,
   themeStyle,
   cardClass,
@@ -367,6 +368,7 @@ export default function PortfolioPage({
 
       <AssetsTable
         assets={totals.list}
+        isDarkMode={isDarkMode}
         formatMoney={formatMoney}
         cardClass={cardClass}
         t={t}

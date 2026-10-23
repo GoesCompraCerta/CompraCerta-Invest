@@ -155,6 +155,7 @@ const formatDetailValue = (key, value, t, lang) => {
 
 export default function AssetsTable({
   assets,
+  isDarkMode,
   formatMoney,
   cardClass,
   t,
@@ -177,7 +178,96 @@ export default function AssetsTable({
         <h3 className="font-bold text-sm text-slate-100">{t.ativosCadastrados}</h3>
       </div>
 
-      <div className="max-h-[500px] overflow-auto">
+      <div className="space-y-3 p-3 md:hidden">
+        {assetList.length > 0 ? assetList.map((item) => {
+          const isExpanded = expandedAssetId === item.id;
+          const metaPercent = item.metaPercent ?? item.meta ?? 0;
+          const assetTypeLabel = t[ASSET_TYPE_TRANSLATION_KEYS[item.type]] || item.type || '-';
+          const fields = [
+            [t.qtd, item.qty],
+            [t.pm, formatMoney(item.pm)],
+            [t.purchaseDate, formatPurchaseDate(item.buyDate, lang)],
+            [t.cotacao, formatMoney(item.price)],
+            [t.valorTotal, formatMoney(item.valorTotal)],
+            [t.pctAtual, formatMetric(item.pctAtual, '%')],
+            [t.meta, `${metaPercent}%`]
+          ];
+
+          return (
+            <article key={item.id} className={`rounded-xl border p-4 ${cardClass}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h4 className={`truncate text-base font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                    {item.ticker}
+                  </h4>
+                  <span className="text-xs text-slate-500">{assetTypeLabel}</span>
+                  {item.name && <p className="truncate text-xs text-slate-500">{item.name}</p>}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleAsset(item.id)}
+                    className="rounded-lg border border-slate-700 bg-slate-900/70 p-2 text-slate-300"
+                    aria-label={isExpanded ? t.closeAnalysis : t.viewAnalysis}
+                    title={isExpanded ? t.closeAnalysis : t.viewAnalysis}
+                  >
+                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateQuote(item)}
+                    disabled={Boolean(updatingAssetId)}
+                    className="p-2 text-slate-400 disabled:opacity-50"
+                    aria-label={updatingAssetId === item.id ? t.atualizando : t.atualizarCotas}
+                    title={updatingAssetId === item.id ? t.atualizando : t.atualizarCotas}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${updatingAssetId === item.id ? 'animate-spin text-emerald-400' : ''}`} />
+                  </button>
+                  <button type="button" onClick={() => onEdit(item)} className="p-2 text-slate-400" aria-label={t.editarAtivo} title={t.editarAtivo}>
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                  <button type="button" onClick={() => onDelete(item.id)} className="p-2 text-slate-400" aria-label={t.cancelar} title={t.cancelar}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                {fields.map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className="text-[10px] font-semibold uppercase text-slate-500">{label}</dt>
+                    <dd className={`truncate text-sm font-semibold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{value}</dd>
+                  </div>
+                ))}
+                <div className="min-w-0">
+                  <dt className="text-[10px] font-semibold uppercase text-slate-500">{t.lucroPrejuizo}</dt>
+                  <dd className={`truncate text-sm font-bold ${Number(item.lucro) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    {formatMoney(item.lucro)} ({Number(item.rentabilidade) >= 0 ? '+' : ''}{formatMetric(item.rentabilidade, '%')})
+                  </dd>
+                </div>
+              </dl>
+              {isExpanded && (
+                <div className="mt-4 border-t border-slate-700/50 pt-3">
+                  <div className="mb-2 text-[10px] font-bold uppercase text-slate-500">{t.analysisIndicators}</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {detailMetricsForItem(item).map(([label, value]) => (
+                      <div key={`${item.id}-${label}`} className={`min-w-0 rounded-lg border p-2 ${cardClass}`}>
+                        <div className="truncate text-[10px] text-slate-500">{translateDetailMetric(label, t)}</div>
+                        <div className={`truncate text-sm font-semibold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                          {formatDetailValue(label, value, t, lang)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </article>
+          );
+        }) : (
+          <div className="py-8 text-center text-xs text-slate-500">{t.semDados}</div>
+        )}
+      </div>
+
+      <div className="hidden max-h-[500px] overflow-auto md:block">
         <table className="w-full text-left text-xs whitespace-nowrap min-w-0">
           <thead className="bg-slate-900/60 text-slate-400 uppercase border-b border-slate-800">
             <tr>

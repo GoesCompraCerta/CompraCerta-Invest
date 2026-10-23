@@ -3,7 +3,7 @@ import { Eye, EyeOff } from 'lucide-react';
 
 export default function KPICards({ totals, formatMoney, themeStyle, cardClass, t, privacyMode, setPrivacyMode }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <div className={`p-4 rounded-2xl border ${cardClass}`}>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] font-bold text-slate-400 uppercase">

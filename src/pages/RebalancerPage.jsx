@@ -96,7 +96,7 @@ export default function RebalancerPage({
     : `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <div className={`w-full space-y-6 rounded-2xl border p-6 ${cardClass}`}>
+    <div className={`w-full space-y-6 rounded-2xl border p-4 md:p-6 ${cardClass}`}>
       <div>
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -137,7 +137,56 @@ export default function RebalancerPage({
         </div>
       </div>
 
-      <div className={`overflow-x-auto rounded-xl border ${cardClass}`}>
+      <div className="space-y-3 md:hidden">
+        {resultadoAporte.items.length > 0 ? resultadoAporte.items.map((item, index) => {
+          const percentual = item.pctAtual;
+          const atingiuMeta = Boolean(item.metaAtingida);
+          const aporteFormatado = oculto
+            ? (atingiuMeta ? 'R$ ••••••' : '+ R$ ••••••')
+            : (atingiuMeta ? formatarMoeda(0) : `+ ${formatarMoeda(item.aporteSugerido)}`);
+
+          return (
+            <article key={item.id || item.ticker || index} className={`rounded-xl border p-4 ${cardClass}`}>
+              <h3 className="font-bold">{item.ticker || t.ativo}</h3>
+              <dl className="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <dt className="text-[10px] font-semibold uppercase text-slate-500">{t.precoAtual}</dt>
+                  <dd className="mt-1 text-sm">{formatarMoeda(getAssetPrice(item))}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-semibold uppercase text-slate-500">{t.valorTotalLabel}</dt>
+                  <dd className="mt-1 text-sm">{formatarMoeda(item.valAtual)}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-semibold uppercase text-slate-500">{t.percentualAtual}</dt>
+                  <dd className="mt-1 text-sm">{percentual.toFixed(1)}%</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-semibold uppercase text-slate-500">{t.metaPercentual}</dt>
+                  <dd className="mt-1 text-sm">{item.meta}%</dd>
+                </div>
+              </dl>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-current/10 pt-3">
+                <span className={`text-xs font-semibold ${atingiuMeta ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {atingiuMeta ? t.metaAtingida : t.comprar}
+                </span>
+                <strong className="text-sm text-emerald-400">{aporteFormatado}</strong>
+              </div>
+              {!atingiuMeta && item.cotasSugeridas > 0 && (
+                <p className="mt-1 text-right text-xs text-slate-400">
+                  {isCrypto(item.type, item.ticker)
+                    ? `(${formatSuggestedQuantity(item.cotasSugeridas)} ${item.ticker})`
+                    : `(${item.cotasSugeridas} cota(s))`}
+                </p>
+              )}
+            </article>
+          );
+        }) : (
+          <div className={`rounded-xl border p-8 text-center text-slate-500 ${cardClass}`}>{t.semDados}</div>
+        )}
+      </div>
+
+      <div className={`hidden overflow-x-auto rounded-xl border md:block ${cardClass}`}>
         <table className="w-full text-left text-xs">
           <thead className="border-b border-slate-800 bg-slate-900/60 uppercase text-slate-400">
             <tr>

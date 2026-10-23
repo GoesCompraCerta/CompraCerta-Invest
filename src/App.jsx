@@ -7,7 +7,8 @@ import {
   Calculator,
   BarChart3,
   Building2,
-  Settings
+  Settings,
+  Menu
 } from 'lucide-react';
 
 // Imports
@@ -142,6 +143,7 @@ export default function App() {
 
   // ── UI State ─────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [pieRadiusLevel, setPieRadiusLevel] = useState(1);
   const [novoAporte, setNovoAporte] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -303,24 +305,48 @@ export default function App() {
           isDarkMode ? 'dark-theme bg-[#0b0f17] text-slate-100' : 'light-theme bg-[#f7f8fa] text-slate-900'
         }`}
       >
+      <header className={`sticky top-0 z-40 flex items-center gap-3 border-b p-4 md:hidden ${
+        isDarkMode ? 'border-slate-800 bg-[#111827]' : 'border-emerald-100 bg-white'
+      }`}>
+        <button
+          type="button"
+          onClick={() => setIsMobileMenuOpen(true)}
+          aria-label={lang === 'pt' ? 'Abrir menu' : 'Open menu'}
+          className="rounded-lg p-2"
+        >
+          <Menu className="h-5 w-5" aria-hidden="true" />
+        </button>
+        <strong>{t.appName}</strong>
+      </header>
+      {isMobileMenuOpen && (
+        <button
+          type="button"
+          aria-label={lang === 'pt' ? 'Fechar menu' : 'Close menu'}
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+        />
+      )}
       {/* ── Sidebar ── */}
-      <Sidebar
-        t={t}
-        navItems={navItems}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        isDarkMode={isDarkMode}
-        setIsDarkMode={setIsDarkMode}
-        themeStyle={themeStyle}
-        privacyMode={privacyMode}
-        setPrivacyMode={setPrivacyMode}
-        lang={lang}
-        setLang={setLang}
-        sidebarCollapsed={sidebarCollapsed}
-        setSidebarCollapsed={setSidebarCollapsed}
-        onLogout={handleLogout}
-        planStatus={planStatus}
-      />
+      <div className={`${isMobileMenuOpen ? 'fixed inset-y-0 left-0 z-50 h-screen w-72 overflow-y-auto shadow-2xl' : 'hidden'} md:relative md:inset-auto md:z-auto md:block md:h-auto md:w-auto md:overflow-visible md:shrink-0 md:shadow-none`}>
+        <Sidebar
+          t={t}
+          navItems={navItems}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          themeStyle={themeStyle}
+          privacyMode={privacyMode}
+          setPrivacyMode={setPrivacyMode}
+          lang={lang}
+          setLang={setLang}
+          sidebarCollapsed={sidebarCollapsed}
+          setSidebarCollapsed={setSidebarCollapsed}
+          onLogout={handleLogout}
+          onMobileClose={() => setIsMobileMenuOpen(false)}
+          planStatus={planStatus}
+        />
+      </div>
 
       {/* ── Main content ── */}
       <main className="flex-1 w-full p-4 md:p-8 overflow-y-auto">
@@ -357,6 +383,7 @@ export default function App() {
         {activeTab === 'carteira' && (
           <PortfolioPage
             totals={totals}
+            isDarkMode={isDarkMode}
             formatMoney={formatMoney}
             themeStyle={themeStyle}
             cardClass={cardClass}

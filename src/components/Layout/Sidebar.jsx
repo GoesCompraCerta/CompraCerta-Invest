@@ -22,7 +22,8 @@ export default function Sidebar({
   lang,
   setLang,
   planStatus,
-  onLogout
+  onLogout,
+  onMobileClose
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -30,7 +31,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`sidebar relative transition-all duration-300 shrink-0 border-r p-3 md:p-4 flex flex-col justify-between ${
+      className={`sidebar relative min-h-screen transition-all duration-300 shrink-0 border-r p-3 md:p-4 flex flex-col justify-between ${
         isDarkMode ? 'bg-[#111827] border-slate-800' : 'bg-[#fdfefc] border-[#bbf7d0]'
       } ${isExpanded ? 'w-full md:w-64' : 'collapsed w-full md:w-[90px]'}`}
     >
@@ -57,7 +58,7 @@ export default function Sidebar({
           <button
             type="button"
             onClick={() => setIsExpanded((prev) => !prev)}
-            className={`sidebar-toggle btn-recolher absolute right-0 top-0 z-10 flex h-6 w-6 shrink-0 items-center justify-center border-0 bg-transparent p-0 shadow-none ${
+            className={`sidebar-toggle btn-recolher absolute right-0 top-0 z-10 hidden h-6 w-6 shrink-0 items-center justify-center border-0 bg-transparent p-0 shadow-none md:flex ${
               isDarkMode
                 ? 'text-slate-300 hover:text-slate-100'
                 : 'text-slate-700 hover:text-slate-900'
@@ -91,7 +92,10 @@ export default function Sidebar({
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  onMobileClose();
+                }}
                 className={`w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                   isActive
                     ? themeStyle.btn
@@ -111,7 +115,10 @@ export default function Sidebar({
         <div className="mt-auto pt-4 border-t border-slate-200 dark:border-slate-800">
           <button
             type="button"
-            onClick={() => setActiveTab('configuracoes')}
+            onClick={() => {
+              setActiveTab('configuracoes');
+              onMobileClose();
+            }}
             className={`w-full flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-xs font-bold transition-all ${
               activeTab === 'configuracoes'
                 ? themeStyle.btn

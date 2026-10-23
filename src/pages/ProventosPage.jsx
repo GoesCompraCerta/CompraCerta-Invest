@@ -146,7 +146,7 @@ export default function ProventosPage({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <section className={`min-w-0 rounded-xl border p-5 lg:col-span-2 ${cardClass}`}>
+        <section className={`min-w-0 rounded-xl border p-4 md:p-5 lg:col-span-2 ${cardClass}`}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-bold">{t.evolucaoMensalProventos}</h3>
             <div className="flex rounded-lg border border-current/15 p-1" role="group" aria-label={t.filtroPeriodoGrafico}>
@@ -172,7 +172,7 @@ export default function ProventosPage({
             </div>
           </div>
           {summaryFailed ? (
-            <div className={`flex h-[260px] items-center justify-center text-center text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <div className={`flex h-56 items-center justify-center text-center text-xs md:h-[260px] ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               <div>
                 <p>{t.erroResumoProventos}</p>
                 <button type="button" className="mt-2 underline" onClick={() => setSummaryAttempt((attempt) => attempt + 1)}>
@@ -181,11 +181,11 @@ export default function ProventosPage({
               </div>
             </div>
           ) : chartData.length === 0 ? (
-            <div className={`flex h-[260px] items-center justify-center text-center text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <div className={`flex h-56 items-center justify-center text-center text-xs md:h-[260px] ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               {t.semProventosResumo}
             </div>
           ) : (
-            <div className={`relative h-[260px] w-full min-w-0 ${themeStyle.text}`}>
+            <div className={`relative h-56 w-full min-w-0 md:h-[260px] ${themeStyle.text}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
                   <CartesianGrid stroke="currentColor" strokeOpacity={0.15} vertical={false} />
@@ -229,7 +229,7 @@ export default function ProventosPage({
           )}
         </section>
 
-        <section className={`rounded-xl border p-5 ${cardClass}`}>
+        <section className={`min-w-0 rounded-xl border p-4 md:p-5 ${cardClass}`}>
           <h3 className="mb-4 text-sm font-bold">{t.yieldOnCost}</h3>
           {summaryFailed ? (
             <p className={`py-8 text-center text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -240,7 +240,33 @@ export default function ProventosPage({
               {t.semProventosResumo}
             </p>
           ) : (
-            <div className="max-h-[260px] overflow-auto">
+            <>
+              <div className="space-y-2 md:hidden">
+                {summary.resumoAtivos.map((item) => (
+                  <article key={item.ticker} className={`rounded-lg border p-3 ${cardClass}`}>
+                    <h4 className={`font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{item.ticker}</h4>
+                    <dl className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <dt className={isDarkMode ? 'text-slate-400' : 'text-slate-600'}>{t.totalRecebidoResumo}</dt>
+                        <dd className={`mt-1 font-semibold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                          {privacyMode ? 'R$ ***' : formatMoney(item.total_recebido)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className={isDarkMode ? 'text-slate-400' : 'text-slate-600'}>{t.yieldOnCost}</dt>
+                        <dd className={`mt-1 font-semibold ${themeStyle.text}`}>
+                          {privacyMode
+                            ? '***'
+                            : item.yield_on_cost == null
+                              ? t.yieldOnCostUnavailable
+                              : `${Number(item.yield_on_cost).toFixed(2)}%`}
+                        </dd>
+                      </div>
+                    </dl>
+                  </article>
+                ))}
+              </div>
+              <div className="hidden max-h-[260px] overflow-auto md:block">
               <table className="w-full text-left text-xs">
                 <thead className={`${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   <tr className="border-b border-current/15">
@@ -267,14 +293,15 @@ export default function ProventosPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </section>
       </div>
 
-      <div className={`p-6 rounded-2xl border space-y-4 ${cardClass}`}>
+      <div className={`rounded-2xl border p-4 md:p-6 space-y-4 ${cardClass}`}>
         <h3 className="font-bold text-sm">{t.lancarProventos}</h3>
-        <form onSubmit={handleSaveProvento} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <form onSubmit={handleSaveProvento} className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <div>
             <label className="text-[10px] font-bold text-slate-400">
               {t.ticker}
@@ -324,7 +351,7 @@ export default function ProventosPage({
               className="w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
             />
           </div>
-          <div className="sm:col-span-4 flex justify-end gap-2">
+          <div className="flex justify-end gap-2 md:col-span-4">
             {editingProvId && (
               <button
                 type="button"
@@ -341,20 +368,20 @@ export default function ProventosPage({
         </form>
       </div>
 
-      <div className={`p-6 rounded-2xl border space-y-3 ${cardClass}`}>
+      <div className={`rounded-2xl border p-4 md:p-6 space-y-3 ${cardClass}`}>
         <h3 className="font-bold text-sm">{t.extratoEntradas}</h3>
         <div className="max-h-[400px] space-y-2 overflow-auto">
           {proventos && proventos.length > 0 ? (
             proventos.map((p) => (
               <div
                 key={p.id}
-                className="extrato-entrada-item p-3 rounded-xl bg-slate-900/30 border border-slate-800 flex items-center justify-between text-xs"
+                className="extrato-entrada-item flex flex-col items-start gap-2 rounded-xl border border-slate-800 bg-slate-900/30 p-3 text-xs md:flex-row md:items-center md:justify-between"
               >
                 <div>
                   <div className="font-bold text-white">{p.ticker}</div>
                   <div className="text-[10px] text-slate-400">{p.date}</div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex w-full items-center justify-between gap-3 md:w-auto md:justify-end">
                   <span className="font-bold text-emerald-400">
                     {formatMoney(p.value)}
                   </span>

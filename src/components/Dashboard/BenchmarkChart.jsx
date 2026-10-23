@@ -218,7 +218,7 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
   };
 
   return (
-    <section className={`w-full rounded-2xl border p-6 ${cardClass}`}>
+    <section className={`w-full rounded-2xl border p-4 md:p-6 ${cardClass}`}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-bold">{t.benchmarkTitle}</h3>
@@ -241,8 +241,8 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
           </button>
         </div>
       </div>
-      {status === 'loading' && <div className="flex h-[360px] items-center justify-center text-xs text-slate-400">{t.benchmarkChartLoading}</div>}
-      {status === 'error' && <div className="flex h-[360px] items-center justify-center text-center text-xs text-rose-400">{t[error] || error}</div>}
+      {status === 'loading' && <div className="flex h-56 items-center justify-center text-xs text-slate-400 md:h-[360px]">{t.benchmarkChartLoading}</div>}
+      {status === 'error' && <div className="flex h-56 items-center justify-center text-center text-xs text-rose-400 md:h-[360px]">{t[error] || error}</div>}
       {status === 'success' && warning && (
         <div className="mb-3">
           <span className="inline-flex rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
@@ -250,9 +250,9 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
           </span>
         </div>
       )}
-      {status === 'success' && data.length === 0 && <div className="flex h-[360px] items-center justify-center text-xs text-slate-400">{t.benchmarkChartNoAssets}</div>}
+      {status === 'success' && data.length === 0 && <div className="flex h-56 items-center justify-center text-xs text-slate-400 md:h-[360px]">{t.benchmarkChartNoAssets}</div>}
       {status === 'success' && data.length >= 2 && (
-        <div className="h-[360px] w-full">
+        <div className="h-56 w-full md:h-[360px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
               <CartesianGrid stroke={gridColor} strokeDasharray="3 3" vertical={false} />
