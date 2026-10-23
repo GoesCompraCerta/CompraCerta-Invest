@@ -461,20 +461,22 @@ export const updateAssetPricesByUserId = async (userId, updates) => {
   }
 };
 
-export const createAsset = async ({ userId, ticker, type, qty, buyPrice, buyDate, meta }) => {
+export const createAsset = async ({ userId, ticker, type, qty, buyPrice, buyDate, meta, price }) => {
   const [result] = await db.execute(`
-    INSERT INTO assets (user_id, ticker, type, qty, buy_price, buy_date, meta)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `, [userId, ticker, type, qty, buyPrice, buyDate, meta]);
+    INSERT INTO assets (user_id, ticker, type, qty, buy_price, buy_date, meta, price, price_updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, IF(? IS NULL, NULL, CURRENT_TIMESTAMP))
+  `, [userId, ticker, type, qty, buyPrice, buyDate, meta, price, price]);
   return getAssetById(result.insertId);
 };
 
-export const updateAssetById = async (assetId, { ticker, type, qty, buyPrice, buyDate, meta }) => {
+export const updateAssetById = async (assetId, { ticker, type, qty, buyPrice, buyDate, meta, price }) => {
   await db.execute(`
     UPDATE assets
-    SET ticker = ?, type = ?, qty = ?, buy_price = ?, buy_date = ?, meta = ?
+    SET ticker = ?, type = ?, qty = ?, buy_price = ?, buy_date = ?, meta = ?,
+      price = COALESCE(?, price),
+      price_updated_at = IF(? IS NULL, price_updated_at, CURRENT_TIMESTAMP)
     WHERE id = ?
-  `, [ticker, type, qty, buyPrice, buyDate, meta, assetId]);
+  `, [ticker, type, qty, buyPrice, buyDate, meta, price, price, assetId]);
   return getAssetById(assetId);
 };
 

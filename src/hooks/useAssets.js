@@ -8,29 +8,11 @@ import {
   updateAsset,
   updateAssetPrices
 } from '../services/assetsService';
+import { getSupplementaryDetails, mergeBackendAssets, toApiAsset } from '../utils/assetSync.js';
 
-const getToday = () => new Date().toISOString().split('T')[0];
 const normalizeAssetList = (value) => Array.isArray(value) ? value : [];
-const CORE_FIELDS = new Set([
-  'id', 'user_id', 'ticker', 'type', 'qty', 'buyPrice', 'buy_price',
-  'buyDate', 'buy_date', 'created_at', 'meta', 'price_updated_at'
-]);
 let initialAssetsRequest = null;
 const PRICE_MAX_AGE_MS = 8 * 60 * 60 * 1000;
-
-const getLegacyBuyDate = (asset) => {
-  const date = String(asset?.buyDate || asset?.createdAt || getToday()).slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : getToday();
-};
-
-const toApiAsset = (asset) => ({
-  ticker: String(asset?.ticker || '').trim().toUpperCase(),
-  type: String(asset?.type || asset?.tipo || '').trim() || null,
-  qty: Number(asset?.qty),
-  buyPrice: Number(asset?.pm ?? asset?.buyPrice),
-  buyDate: getLegacyBuyDate(asset),
-  meta: asset?.meta == null || asset.meta === '' ? null : Number(asset.meta)
-});
 
 const getAssetSignature = (asset) => {
   const apiAsset = toApiAsset(asset);
@@ -42,10 +24,6 @@ const getAssetSignature = (asset) => {
     apiAsset.buyDate
   ]);
 };
-
-const getSupplementaryDetails = (asset) => Object.fromEntries(
-  Object.entries(asset || {}).filter(([key]) => !CORE_FIELDS.has(key))
-);
 
 const needsPriceRefresh = (asset) => {
   const price = Number(asset.price);
@@ -93,25 +71,6 @@ const refreshStaleAssetPrices = async (assets) => {
   }
 };
 
-const mergeBackendAssets = (remoteAssets, details) => normalizeAssetList(remoteAssets).map((asset) => {
-  const id = String(asset.id);
-  const extra = details[id] && typeof details[id] === 'object' ? details[id] : {};
-  const supplementaryDetails = Object.fromEntries(
-    Object.entries(extra).filter(([key]) => key !== 'meta')
-  );
-  return {
-    ...supplementaryDetails,
-    ...asset,
-    id,
-    qty: Number(asset.qty) || 0,
-    pm: Number(asset.buyPrice) || 0,
-    price: asset.price == null ? (Number(extra.price) || 0) : Number(asset.price),
-    buyDate: String(asset.buyDate || ''),
-    meta: asset.meta == null ? null : Number(asset.meta),
-    price_updated_at: asset.price_updated_at || null
-  };
-});
-
 const importLegacyAssets = async (remoteAssets, legacyAssets, details) => {
   const importedAssets = [...normalizeAssetList(remoteAssets)];
   const matchedIds = new Set();
@@ -125,7 +84,7 @@ const importLegacyAssets = async (remoteAssets, legacyAssets, details) => {
     if (!backendAsset) {
       backendAsset = await createAsset(toApiAsset(legacyAsset));
       importedAssets.push(backendAsset);
-    } else if (backendAsset.meta == null && legacyAsset.meta != null) {
+    } else if (backendAsset.meta == null && (legacyAsset.meta ?? legacyAsset.metaPercent) != null) {
       backendAsset = await updateAsset(backendAsset.id, toApiAsset(legacyAsset));
       const importedIndex = importedAssets.findIndex(
         (asset) => String(asset.id) === String(backendAsset.id)
@@ -159,7 +118,30 @@ const loadBackendAssets = async () => {
         remoteAssets = await importLegacyAssets(remoteAssets, legacyAssets, details);
       }
 
-      const pricedAssets = await refreshStaleAssetPrices(remoteAssets);
+      let pricedAssets = await refreshStaleAssetPrices(remoteAssets);
+      const localPriceUpdates = pricedAssets
+        .filter((asset) => {
+          const cachedPrice = Number(details[String(asset.id)]?.price);
+          return !(Number(asset.price) > 0) && Number.isFinite(cachedPrice) && cachedPrice > 0;
+        })
+        .map((asset) => ({
+          id: Number(asset.id),
+          price: Number(details[String(asset.id)].price)
+        }));
+
+      if (localPriceUpdates.length > 0) {
+        const localPricesById = new Map(localPriceUpdates.map(({ id, price }) => [String(id), price]));
+        try {
+          const savedAssets = await updateAssetPrices(localPriceUpdates);
+          const savedById = new Map(savedAssets.map((asset) => [String(asset.id), asset]));
+          pricedAssets = pricedAssets.map((asset) => savedById.get(String(asset.id)) || asset);
+        } catch {
+          pricedAssets = pricedAssets.map((asset) => {
+            const price = localPricesById.get(String(asset.id));
+            return price ? { ...asset, price } : asset;
+          });
+        }
+      }
       return mergeBackendAssets(pricedAssets, details);
     })().finally(() => {
       initialAssetsRequest = null;

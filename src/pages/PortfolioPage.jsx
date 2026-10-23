@@ -297,7 +297,7 @@ export default function PortfolioPage({
       dividendo24m: String(item.dividendo24m ?? ''),
       taxaRentabilidade: String(item.taxaRentabilidade ?? ''),
       dataVencimento: item.dataVencimento ?? '',
-      meta: String(item.metaPercent)
+      meta: String(item.meta ?? item.metaPercent ?? 10)
     });
   };
 

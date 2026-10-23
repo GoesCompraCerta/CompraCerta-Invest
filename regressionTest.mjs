@@ -4,6 +4,7 @@ import {
   calculateFiiMethods,
   getSelectedFiiDy
 } from './src/services/calculationService.js';
+import { mergeBackendAssets, toApiAsset } from './src/utils/assetSync.js';
 import { calculateStaticRebalance } from './src/services/rebalanceService.js';
 import {
   createAsset,
@@ -321,6 +322,59 @@ addTest(
 );
 
 addTest(
+  'Ativo hidratado da API preserva meta, preço e totais da carteira',
+  {},
+  'metaPercent e preço persistem no payload e alimentam os cálculos da carteira',
+  () => {
+    const apiPayload = toApiAsset({
+      ticker: 'TEST3',
+      type: 'Ações (B3)',
+      qty: 3,
+      pm: 20,
+      buyDate: '2026-10-19',
+      metaPercent: 25,
+      price: 30
+    });
+    const hydratedAsset = mergeBackendAssets([{
+      id: 17,
+      ticker: apiPayload.ticker,
+      type: apiPayload.type,
+      qty: apiPayload.qty,
+      buyPrice: apiPayload.buyPrice,
+      buyDate: apiPayload.buyDate,
+      meta: apiPayload.meta,
+      price: apiPayload.price
+    }], {})[0];
+    const totals = calculatePortfolioTotals([hydratedAsset], []);
+    const asset = totals.list[0];
+    const recoveredAsset = mergeBackendAssets([{
+      id: 18,
+      ticker: 'TEST3',
+      type: 'Ações (B3)',
+      qty: 3,
+      buyPrice: 20,
+      buyDate: '2026-10-19',
+      meta: null,
+      price: null
+    }], { 18: { metaPercent: 25, price: 30 } })[0];
+
+    return apiPayload.meta === 25
+      && apiPayload.price === 30
+      && hydratedAsset.meta === 25
+      && hydratedAsset.metaPercent === 25
+      && asset.qty === 3
+      && asset.pm === 20
+      && asset.price === 30
+      && asset.valorTotal === 90
+      && asset.valorInvestido === 60
+      && asset.lucro === 30
+      && recoveredAsset.meta === 25
+      && recoveredAsset.metaPercent === 25
+      && recoveredAsset.price === 30;
+  }
+);
+
+addTest(
   'Rebalance: alvo usa patrimônio atual e arredonda cotas no serviço',
   {},
   'IVVB11 usa o alvo atual; déficit menor que uma cota fica no caixa',
@@ -591,16 +645,20 @@ addTest(
         qty: 1,
         buyPrice: 10,
         buyDate: '2026-10-19',
-        meta: 12.5
+        meta: 12.5,
+        price: 15
       };
       const created = await createAsset(asset);
       const firstRead = await listAssets();
-      const updated = await updateAsset(1, { ...asset, meta: 22.75 });
+      const updated = await updateAsset(1, { ...asset, meta: 22.75, price: 18 });
       const secondRead = await listAssets();
 
       return created.meta === 12.5
+        && created.price === 15
         && firstRead[0].meta === 12.5
+        && firstRead[0].price === 15
         && updated.meta === 22.75
+        && updated.price === 18
         && secondRead[0].meta === 22.75;
     } finally {
       globalThis.fetch = originalFetch;

@@ -617,17 +617,19 @@ const readAndValidateAsset = async (request, response) => {
   const buyPrice = Number(payload?.buyPrice);
   const buyDate = payload?.buyDate;
   const meta = payload?.meta == null || payload.meta === '' ? null : Number(payload.meta);
+  const price = payload?.price == null || payload.price === '' ? null : Number(payload.price);
 
   if (!ticker || !Number.isFinite(qty) || qty <= 0
     || payload?.buyPrice === '' || payload?.buyPrice == null
     || !Number.isFinite(buyPrice) || buyPrice < 0
     || (meta !== null && (!Number.isFinite(meta) || meta < 0 || meta > 100))
+    || (price !== null && (!Number.isFinite(price) || price <= 0))
     || !isValidIsoDate(buyDate)) {
-    sendJson(response, 400, { error: 'Informe ticker, quantidade positiva, preço médio válido, meta entre 0 e 100 e data YYYY-MM-DD.' });
+    sendJson(response, 400, { error: 'Informe ticker, quantidade positiva, preços válidos, meta entre 0 e 100 e data YYYY-MM-DD.' });
     return null;
   }
 
-  return { ticker, type: type || null, qty, buyPrice, buyDate, meta };
+  return { ticker, type: type || null, qty, buyPrice, buyDate, meta, price };
 };
 
 const handleListAssets = async (request, response) => {
