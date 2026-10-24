@@ -5,6 +5,7 @@ import {
   getSelectedFiiDy
 } from './src/services/calculationService.js';
 import { mergeBackendAssets, toApiAsset } from './src/utils/assetSync.js';
+import { groupAssetsByClass } from './src/utils/assetClassification.js';
 import { calculateStaticRebalance } from './src/services/rebalanceService.js';
 import {
   createAsset,
@@ -318,6 +319,97 @@ addTest(
       && approximately(asset.valorInvestido, 200)
       && approximately(asset.valorTotal, 160)
       && approximately(asset.lucro, -40);
+  }
+);
+
+addTest(
+  'Visão por Classe classifica tipos e agrega valores da carteira',
+  {},
+  'FIIs ficam isolados e o lucro agregado deriva dos valores investidos e atuais',
+  () => {
+    const groups = groupAssetsByClass([
+      { type: 'Ação (B3)', qty: '10', buy_price: '10', price: '15', valorInvestido: 1, valorTotal: 1 },
+      { type: 'Ações', qty: 100, pm: 100, price: 200 },
+      { type: 'FII', qty: 5, buy_price: 10, price: 8 },
+      { type: 'FII B3', qty: 5, buy_price: 10, price: 9 },
+      { type: 'FIIs', qty: 5, buy_price: 10, price: 9 },
+      { type: 'FIIs (B3)', qty: 0, buy_price: 10, price: 9 },
+      { type: 'Fundo Imobiliário', qty: 5, buy_price: 10, price: 10 },
+      { type: 'ETF B3', qty: 5, buy_price: 10, price: 14 },
+      { type: 'BDR B3', qty: 10, pm: 10, price: 10 },
+      { type: 'Ação Internacional (EUA)', qty: 10, buyPrice: 10, price: 10 },
+      { type: 'REIT', qty: 10, buy_price: 10, price: 9 },
+      { type: 'ETF Internacional', qty: 10, pm: 10, price: 11 },
+      { type: 'Renda Fixa', qty: 50, buy_price: 10, price: 10.2 },
+      { type: 'Cripto', qty: 50, pm: 50, price: 1.2 }
+    ]);
+    const actions = groups.find((group) => group.key === 'actions');
+    const realEstate = groups.find((group) => group.key === 'realEstate');
+    const international = groups.find((group) => group.key === 'international');
+    const fixedIncome = groups.find((group) => group.key === 'fixedIncome');
+    const crypto = groups.find((group) => group.key === 'crypto');
+
+    return groups.length === 5
+      && actions.assets.length === 1
+      && actions.invested === 100
+      && actions.currentValue === 150
+      && actions.profit === 50
+      && approximately(actions.percentage, (150 / 1370) * 100)
+      && realEstate.assets.length === 5
+      && realEstate.invested === 200
+      && realEstate.currentValue === 180
+      && realEstate.profit === -20
+      && international.assets.length === 5
+      && international.invested === 450
+      && international.currentValue === 470
+      && international.profit === 20
+      && fixedIncome.invested === 500
+      && approximately(fixedIncome.currentValue, 510)
+      && crypto.invested === 2500
+      && crypto.currentValue === 60;
+  }
+);
+
+addTest(
+  'Carteira real classifica Ações, FIIs, ETF e Renda Fixa pelo tipo exato',
+  {},
+  'ticker não altera classe; KLBN11 e TAEE11 ficam em Ações e IVVB11 em Internacional',
+  () => {
+    const makeAssets = (type, tickers, invested, profits) => tickers.map((ticker, index) => ({
+      ticker,
+      type,
+      qty: 1,
+      buy_price: invested[index],
+      price: invested[index] + profits[index]
+    }));
+    const groups = groupAssetsByClass([
+      ...makeAssets('Ação (B3)', ['PETR4', 'BBSE3', 'TAEE11', 'KLBN11', 'ITSA4'],
+        [1000, 900, 800, 700, 416.80], [100, 100, 100, 100, 104.90]),
+      ...makeAssets('FII (B3)', ['BRCO11', 'RBRR11', 'RBRY11', 'XPML11', 'TRXF11', 'GARE11', 'GGRC11'],
+        [600, 550, 525, 500, 550, 600, 550.41], [-10, -10, -10, -10, -10, -10, -14.04]),
+      ...makeAssets('ETF (B3)', ['IVVB11'], [500], [50]),
+      ...makeAssets('Renda Fixa', ['M.PAGO'], [4400], [0])
+    ]);
+    const tipoFallbackGroup = groupAssetsByClass([
+      { ticker: 'TIPO-FALLBACK', tipo: 'Ação (B3)', qty: 1, buy_price: 10, price: 12 }
+    ]).find(({ key }) => key === 'actions');
+    const actions = groups.find(({ key }) => key === 'actions');
+    const realEstate = groups.find(({ key }) => key === 'realEstate');
+    const international = groups.find(({ key }) => key === 'international');
+    const fixedIncome = groups.find(({ key }) => key === 'fixedIncome');
+
+    return actions.invested === 3816.80
+      && actions.currentValue === 4321.70
+      && approximately(actions.profit, 504.90)
+      && ['KLBN11', 'TAEE11'].every((ticker) => actions.assets.some((asset) => asset.ticker === ticker))
+      && !realEstate.assets.some((asset) => ['KLBN11', 'TAEE11'].includes(asset.ticker))
+      && realEstate.invested === 3875.41
+      && realEstate.currentValue === 3801.37
+      && approximately(realEstate.profit, -74.04)
+      && fixedIncome.invested === 4400
+      && international.assets.some((asset) => asset.ticker === 'IVVB11')
+      && !actions.assets.some((asset) => asset.ticker === 'IVVB11')
+      && tipoFallbackGroup?.assets[0]?.ticker === 'TIPO-FALLBACK';
   }
 );
 
