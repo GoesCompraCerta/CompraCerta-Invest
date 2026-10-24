@@ -2,23 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Edit3, Trash2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getProventosSummary } from '../services/proventosService';
+import { toDateDisplayValue, toStoredDate } from '../utils/proventoDate.js';
 
 const EMPTY_SUMMARY = { evolucaoMensal: [], resumoAtivos: [] };
-
-const formatDateInput = (value) => {
-  const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
-  const day = digits.slice(0, 2);
-  const month = digits.slice(2, 4);
-  const year = digits.slice(4, 8);
-
-  return [day, month, year].filter(Boolean).join('/');
-};
-
-const toStoredDate = (value) => {
-  const match = String(value || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-
-  return match ? `${match[3]}-${match[2]}-${match[1]}` : value;
-};
 
 export default function ProventosPage({
   proventos,
@@ -134,7 +120,7 @@ export default function ProventosPage({
       ticker: p.ticker,
       value: String(p.value),
       type: p.type || 'Dividendos',
-      date: formatDateInput(p.date)
+      date: toDateDisplayValue(p.date)
     });
   };
 
@@ -348,7 +334,7 @@ export default function ProventosPage({
               inputMode="numeric"
               placeholder=""
               value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: formatDateInput(e.target.value) })}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               className="w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
             />
           </div>

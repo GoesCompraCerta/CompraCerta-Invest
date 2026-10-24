@@ -6,6 +6,11 @@ import {
 } from './src/services/calculationService.js';
 import { mergeBackendAssets, toApiAsset } from './src/utils/assetSync.js';
 import { groupAssetsByClass } from './src/utils/assetClassification.js';
+import {
+  toDateDisplayValue,
+  toDateInputValue,
+  toStoredDate
+} from './src/utils/proventoDate.js';
 import { calculateStaticRebalance } from './src/services/rebalanceService.js';
 import {
   createAsset,
@@ -37,6 +42,28 @@ const hasStatus = (result, color, score, total) => (
   && result.color === color
   && result.score === score
   && result.total === total
+);
+
+addTest(
+  'Data do provento e normalizada para input date',
+  {},
+  'ISO, timestamp, Date e data brasileira produzem YYYY-MM-DD',
+  () => {
+    const timestamp = Date.UTC(2026, 9, 22);
+    return toDateInputValue('2026-10-22') === '2026-10-22'
+      && toDateInputValue('2026-10-22T15:30:00.000Z') === '2026-10-22'
+      && toDateInputValue('22/10/2026') === '2026-10-22'
+      && toDateInputValue(timestamp) === '2026-10-22'
+      && toDateInputValue(String(timestamp / 1000)) === '2026-10-22'
+      && toDateInputValue(new Date(timestamp)) === '2026-10-22'
+      && toDateInputValue('2026-02-30') === ''
+      && toDateInputValue('data inválida') === ''
+      && toDateDisplayValue('2026-10-22') === '22/10/2026'
+      && toDateDisplayValue(timestamp) === '22/10/2026'
+      && toStoredDate('22/10/2026') === '2026-10-22'
+      && toStoredDate('2026-02-30') === ''
+      && toStoredDate('data inválida') === '';
+  }
 );
 
 addTest(
