@@ -44,6 +44,37 @@ body {
   background: #34d399;
 }
 
+.dark-theme {
+  --app-scrollbar-thumb: rgba(52, 211, 153, 0.55);
+}
+
+.light-theme {
+  --app-scrollbar-thumb: rgba(5, 150, 105, 0.5);
+}
+
+.app-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-scrollbar-thumb) transparent;
+}
+
+.app-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.85);
+}
+
 /* Mantém os controles da Sidebar clicáveis em qualquer tema. */
 .sidebar-toggle,
 .btn-configuracao,

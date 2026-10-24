@@ -137,7 +137,7 @@ export default function RebalancerPage({
         </div>
       </div>
 
-      <div className="space-y-3 md:hidden">
+      <div className="app-scrollbar max-h-[400px] space-y-3 overflow-y-auto pr-1 md:hidden">
         {resultadoAporte.items.length > 0 ? resultadoAporte.items.map((item, index) => {
           const percentual = item.pctAtual;
           const atingiuMeta = Boolean(item.metaAtingida);
@@ -186,16 +186,16 @@ export default function RebalancerPage({
         )}
       </div>
 
-      <div className={`hidden overflow-x-auto rounded-xl border md:block ${cardClass}`}>
+      <div className={`app-scrollbar hidden max-h-[400px] overflow-auto rounded-xl border md:block ${cardClass}`}>
         <table className="w-full text-left text-xs">
           <thead className="border-b border-slate-800 bg-slate-900/60 uppercase text-slate-400">
             <tr>
-              <th className="p-4">{t.ativo}</th>
-              <th className="p-4">{t.precoAtual}</th>
-              <th className="p-4">{t.valorTotalLabel}</th>
-              <th className="p-4">{t.percentualAtual}</th>
-              <th className="p-4">{t.metaPercentual}</th>
-              <th className="p-4">{t.aporteSugerido}</th>
+              <th className="sticky top-0 z-10 bg-slate-900/90 p-4">{t.ativo}</th>
+              <th className="sticky top-0 z-10 bg-slate-900/90 p-4">{t.precoAtual}</th>
+              <th className="sticky top-0 z-10 bg-slate-900/90 p-4">{t.valorTotalLabel}</th>
+              <th className="sticky top-0 z-10 bg-slate-900/90 p-4">{t.percentualAtual}</th>
+              <th className="sticky top-0 z-10 bg-slate-900/90 p-4">{t.metaPercentual}</th>
+              <th className="sticky top-0 z-10 bg-slate-900/90 p-4">{t.aporteSugerido}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">

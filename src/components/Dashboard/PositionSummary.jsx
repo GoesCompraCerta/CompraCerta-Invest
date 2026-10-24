@@ -33,7 +33,7 @@ export default function PositionSummary({
   return (
     <div className={`w-full rounded-2xl border p-4 md:p-5 ${cardClass}`}>
       <h3 className="mb-3 text-sm font-bold">{t.resumoPosicionamento}</h3>
-      <div className="space-y-2.5">
+      <div className="app-scrollbar max-h-[300px] space-y-2.5 overflow-y-auto pr-1">
         {sortedAssets.length > 0 ? (
           sortedAssets.map((item, idx) => {
             const lucro = Number(item.lucro) || 0;

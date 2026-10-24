@@ -241,7 +241,7 @@ export default function ProventosPage({
             </p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="app-scrollbar max-h-[250px] space-y-2 overflow-y-auto pr-1 md:hidden">
                 {summary.resumoAtivos.map((item) => (
                   <article key={item.ticker} className={`rounded-lg border p-3 ${cardClass}`}>
                     <h4 className={`font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{item.ticker}</h4>
@@ -266,7 +266,7 @@ export default function ProventosPage({
                   </article>
                 ))}
               </div>
-              <div className="hidden max-h-[260px] overflow-auto md:block">
+              <div className="app-scrollbar hidden max-h-[250px] overflow-y-auto md:block">
               <table className="w-full text-left text-xs">
                 <thead className={`${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   <tr className="border-b border-current/15">
@@ -370,7 +370,7 @@ export default function ProventosPage({
 
       <div className={`rounded-2xl border p-4 md:p-6 space-y-3 ${cardClass}`}>
         <h3 className="font-bold text-sm">{t.extratoEntradas}</h3>
-        <div className="max-h-[400px] space-y-2 overflow-auto">
+        <div className="app-scrollbar max-h-[250px] space-y-2 overflow-y-auto pr-1">
           {proventos && proventos.length > 0 ? (
             proventos.map((p) => (
               <div
