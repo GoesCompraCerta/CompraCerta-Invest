@@ -336,6 +336,7 @@ export default function ProventosPage({
             >
               <option value="Dividendos">{t.dividendos}</option>
               <option value="JCP">{t.jcp}</option>
+              <option value="Rendimento">{t.rendimento}</option>
             </select>
           </div>
           <div>

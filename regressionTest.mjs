@@ -876,7 +876,7 @@ addTest(
       const entry = {
         ticker: 'TEST3',
         value: 12.5,
-        type: 'Dividendos',
+        type: 'Rendimento',
         date: '2026-10-19'
       };
       const created = await createProventoRequest(entry);
@@ -886,10 +886,14 @@ addTest(
       await deleteProventoRequest(created.id);
       const finalRead = await listProventos();
 
-      return created.value === 12.5
+      return created.type === 'Rendimento'
+        && created.value === 12.5
         && firstRead.length === 1
+        && firstRead[0].type === 'Rendimento'
         && firstRead[0].value === 12.5
+        && updated.type === 'Rendimento'
         && updated.value === 22.75
+        && secondRead[0].type === 'Rendimento'
         && secondRead[0].value === 22.75
         && finalRead.length === 0;
     } finally {
