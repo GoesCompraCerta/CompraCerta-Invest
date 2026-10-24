@@ -8,23 +8,37 @@ const request = async (path, options = {}) => {
     throw error;
   }
 
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.headers || {})
-    }
-  });
-  const payload = await response.json().catch(() => ({}));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(path, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.headers || {})
+      }
+    });
+    const payload = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    const error = new Error(payload.error || 'Não foi possível acessar seus ativos.');
-    error.status = response.status;
-    throw error;
+    if (!response.ok) {
+      const error = new Error(payload.error || 'Não foi possível acessar seus ativos.');
+      error.status = response.status;
+      throw error;
+    }
+    return payload;
+  } catch (cause) {
+    if (controller.signal.aborted) {
+      const error = new Error('assetRequestTimeoutError');
+      error.code = 'ASSET_REQUEST_TIMEOUT';
+      throw error;
+    }
+    throw cause;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return payload;
 };
 
 export const listAssets = async () => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit3, Trash2, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Edit3, Trash2, RefreshCw, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { normalizeFiiDyPeriod } from '../../services/calculationService';
 import { ASSET_TYPE_TRANSLATION_KEYS } from '../../constants/translations';
 
@@ -169,14 +169,25 @@ export default function AssetsTable({
   lang,
   onEdit,
   onDelete,
+  loadingEditAssetId,
   onUpdateQuote,
   updatingAssetId
 }) {
   const assetList = Array.isArray(assets) ? assets : [];
   const [expandedAssetId, setExpandedAssetId] = React.useState(null);
+  const [deletingAssetId, setDeletingAssetId] = React.useState(null);
 
   const toggleAsset = (assetId) => {
     setExpandedAssetId((current) => (current === assetId ? null : assetId));
+  };
+
+  const handleDeleteAsset = async (assetId) => {
+    setDeletingAssetId(assetId);
+    try {
+      await onDelete(assetId);
+    } finally {
+      setDeletingAssetId(null);
+    }
   };
 
   return (
@@ -188,6 +199,8 @@ export default function AssetsTable({
       <div className="space-y-3 p-3 md:hidden">
         {assetList.length > 0 ? assetList.map((item) => {
           const isExpanded = expandedAssetId === item.id;
+          const isEditing = String(loadingEditAssetId) === String(item.id);
+          const isDeleting = String(deletingAssetId) === String(item.id);
           const assetTypeLabel = t[ASSET_TYPE_TRANSLATION_KEYS[item.type]] || item.type || '-';
           const fields = [
             [t.qtd, item.qty],
@@ -229,11 +242,11 @@ export default function AssetsTable({
                   >
                     <RefreshCw className={`h-4 w-4 ${updatingAssetId === item.id ? 'animate-spin text-emerald-400' : ''}`} />
                   </button>
-                  <button type="button" onClick={() => onEdit(item)} className="p-2 text-slate-400" aria-label={t.editarAtivo} title={t.editarAtivo}>
-                    <Edit3 className="h-4 w-4" />
+                  <button type="button" onClick={() => onEdit(item)} disabled={isEditing || isDeleting} aria-busy={isEditing} className="p-2 text-slate-400 disabled:cursor-wait disabled:opacity-50" aria-label={isEditing ? t.assetEditing : t.editarAtivo} title={isEditing ? t.assetEditing : t.editarAtivo}>
+                    {isEditing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Edit3 className="h-4 w-4" />}
                   </button>
-                  <button type="button" onClick={() => onDelete(item.id)} className="p-2 text-slate-400" aria-label={t.cancelar} title={t.cancelar}>
-                    <Trash2 className="h-4 w-4" />
+                  <button type="button" onClick={() => handleDeleteAsset(item.id)} disabled={isDeleting || isEditing} aria-busy={isDeleting} className="p-2 text-slate-400 disabled:cursor-wait disabled:opacity-50" aria-label={isDeleting ? t.assetDeleting : t.cancelar} title={isDeleting ? t.assetDeleting : t.cancelar}>
+                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
@@ -294,6 +307,8 @@ export default function AssetsTable({
             {assetList.length > 0 ? (
               assetList.map((item) => {
                 const isExpanded = expandedAssetId === item.id;
+                const isEditing = String(loadingEditAssetId) === String(item.id);
+                const isDeleting = String(deletingAssetId) === String(item.id);
                 const metaPercent = formatAssetMeta(item);
                 const assetTypeLabel = t[ASSET_TYPE_TRANSLATION_KEYS[item.type]] || item.type || '-';
 
@@ -358,20 +373,24 @@ export default function AssetsTable({
                           <button
                             type="button"
                             onClick={() => onEdit(item)}
-                            className="p-1.5 text-slate-400 hover:text-sky-400"
-                            title={t.editarAtivo}
-                            aria-label={t.editarAtivo}
+                            disabled={isEditing || isDeleting}
+                            aria-busy={isEditing}
+                            className="p-1.5 text-slate-400 hover:text-sky-400 disabled:cursor-wait disabled:opacity-50"
+                            title={isEditing ? t.assetEditing : t.editarAtivo}
+                            aria-label={isEditing ? t.assetEditing : t.editarAtivo}
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            {isEditing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />}
                           </button>
                           <button
                             type="button"
-                            onClick={() => onDelete(item.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400"
-                            title={t.cancelar}
-                            aria-label={t.cancelar}
+                            onClick={() => handleDeleteAsset(item.id)}
+                            disabled={isDeleting || isEditing}
+                            aria-busy={isDeleting}
+                            className="p-1.5 text-slate-400 hover:text-rose-400 disabled:cursor-wait disabled:opacity-50"
+                            title={isDeleting ? t.assetDeleting : t.cancelar}
+                            aria-label={isDeleting ? t.assetDeleting : t.cancelar}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       </td>

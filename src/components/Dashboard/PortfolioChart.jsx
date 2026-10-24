@@ -18,9 +18,9 @@ export default function PortfolioChart({
   ];
 
   const renderPieLabel = ({ cx, cy, midAngle, outerRadius, percent, ticker }) => {
-    if (!percent || percent <= 0.01) return null;
+    if (!percent || percent <= 0) return null;
     const RADIAN = Math.PI / 180;
-    const radius = outerRadius + 22;
+    const radius = outerRadius + 28;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
     return (
@@ -30,7 +30,7 @@ export default function PortfolioChart({
         fill={isDarkMode ? '#94A3B8' : '#475569'}
         textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
-        style={{ fontSize: 11, fontWeight: 700 }}
+        style={{ fontSize: 10, fontWeight: 700 }}
       >
         {`${ticker} (${(percent * 100).toFixed(1)}%)`}
       </text>

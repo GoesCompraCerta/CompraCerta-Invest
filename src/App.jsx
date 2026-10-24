@@ -144,7 +144,14 @@ export default function App() {
   // ── UI State ─────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [pieRadiusLevel, setPieRadiusLevel] = useState(1);
+  const [pieRadiusLevel, setPieRadiusLevel] = useState(() => {
+    try {
+      const savedLevel = Number(localStorage.getItem('goes_compra_certa_chart_size'));
+      return Number.isInteger(savedLevel) && savedLevel >= 0 && savedLevel <= 2 ? savedLevel : 1;
+    } catch {
+      return 1;
+    }
+  });
   const [novoAporte, setNovoAporte] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -158,6 +165,15 @@ export default function App() {
 
   // ── Translations ─────────────────────────────────────────────────────────
   const t = TRANSLATIONS[lang];
+
+  const savePieRadiusLevel = (level) => {
+    setPieRadiusLevel(level);
+    try {
+      localStorage.setItem('goes_compra_certa_chart_size', String(level));
+    } catch {
+      // Mantém o gráfico funcional se o storage estiver indisponível.
+    }
+  };
 
   useEffect(() => {
     if (!isAuthChecking && isAuthenticated && (pathname === '/login' || pathname === '/register')) {
@@ -372,7 +388,7 @@ export default function App() {
             isDarkMode={isDarkMode}
             lang={lang}
             pieRadiusLevel={pieRadiusLevel}
-            setPieRadiusLevel={setPieRadiusLevel}
+            setPieRadiusLevel={savePieRadiusLevel}
             privacyMode={privacyMode}
             setPrivacyMode={setPrivacyMode}
             t={t}

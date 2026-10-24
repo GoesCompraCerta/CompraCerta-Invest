@@ -220,9 +220,9 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
   return (
     <section className={`w-full rounded-2xl border p-4 md:p-6 ${cardClass}`}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <h3 className="text-sm font-bold">{t.benchmarkTitle}</h3>
-          <p className="mt-1 text-xs text-slate-400">{t.benchmarkSubtitle.replace('{months}', String(selectedMonths))}</p>
+          <p className="mt-1 min-w-0 break-words text-sm text-slate-400 md:text-xs">{t.benchmarkSubtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <select

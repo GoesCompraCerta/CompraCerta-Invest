@@ -52,6 +52,8 @@ export default function PortfolioPage({
   updateMsg
 }) {
   const [editingAssetId, setEditingAssetId] = useState(null);
+  const [loadingEditAssetId, setLoadingEditAssetId] = useState(null);
+  const [isSavingAsset, setIsSavingAsset] = useState(false);
   const [isFormDirty, setIsFormDirty] = useState(false);
   const [pmAlreadyInBrl, setPmAlreadyInBrl] = useState(false);
   const [priceAlreadyInBrl, setPriceAlreadyInBrl] = useState(false);
@@ -187,14 +189,17 @@ export default function PortfolioPage({
       metaPercent: enteredMeta ?? 10
     };
 
-    if (editingAssetId) {
-      const savedAsset = await onUpdateAsset(editingAssetId, updated);
-      if (!savedAsset) return;
-      setEditingAssetId(null);
-    } else {
-      const createdAsset = await onAddAsset(updated);
-      if (!createdAsset) return;
+    setIsSavingAsset(true);
+    let savedAsset;
+    try {
+      savedAsset = editingAssetId
+        ? await onUpdateAsset(editingAssetId, updated)
+        : await onAddAsset(updated);
+    } finally {
+      setIsSavingAsset(false);
     }
+    if (!savedAsset) return;
+    if (editingAssetId) setEditingAssetId(null);
 
     setIsFormDirty(false);
     setPriceAlreadyInBrl(false);
@@ -237,6 +242,7 @@ export default function PortfolioPage({
   };
 
   const handleEditAsset = async (item) => {
+    setLoadingEditAssetId(item.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     const normalizedType = normalizeAssetType(item.type);
     const international = isForeignAsset(normalizedType);
@@ -255,6 +261,7 @@ export default function PortfolioPage({
       } catch (error) {
         console.error('Erro ao converter valores para a moeda original:', error);
         window.alert(t.exchangeLoadForeignError);
+        setLoadingEditAssetId(null);
         return;
       }
     }
@@ -303,6 +310,7 @@ export default function PortfolioPage({
       dataVencimento: item.dataVencimento ?? '',
       meta: String(item.meta ?? item.metaPercent ?? 10)
     });
+    setLoadingEditAssetId(null);
   };
 
   const handleAssetTypeChange = () => {
@@ -361,6 +369,7 @@ export default function PortfolioPage({
           formData={formData}
           onFormChange={setFormData}
           isFormDirty={isFormDirty}
+          isSaving={isSavingAsset}
           onFormDirty={() => setIsFormDirty(true)}
           onTypeChange={handleAssetTypeChange}
           pmAlreadyInBrl={pmAlreadyInBrl}
@@ -382,6 +391,7 @@ export default function PortfolioPage({
         lang={lang}
         onEdit={handleEditAsset}
         onDelete={onDeleteAsset}
+        loadingEditAssetId={loadingEditAssetId}
         onUpdateQuote={(item) => onUpdateQuote(item, onUpdateAsset)}
         updatingAssetId={updatingAssetId}
       />

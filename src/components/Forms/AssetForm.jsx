@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Plus } from 'lucide-react';
+import { Calendar, Loader2, Plus } from 'lucide-react';
 import { ASSET_TYPES } from '../../constants/config';
 import { isCrypto } from '../../utils/cryptoUtils';
 
@@ -58,7 +58,7 @@ const isForeignAsset = (type) => [
   'Ações (EUA / Globais)', 'REITs (EUA / Globais)', 'ETFs (EUA / Globais)'
 ].includes(type);
 
-export default function AssetForm({ onSubmit, editingId, onCancel, formData, onFormChange, onFormDirty, isFormDirty, onTypeChange, pmAlreadyInBrl, priceAlreadyInBrl, themeStyle, t }) {
+export default function AssetForm({ onSubmit, editingId, onCancel, formData, onFormChange, onFormDirty, isFormDirty, isSaving, onTypeChange, pmAlreadyInBrl, priceAlreadyInBrl, themeStyle, t }) {
   React.useEffect(() => {
     if (editingId) return;
     const lastAssetType = getLastAssetType();
@@ -268,13 +268,16 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
         <div className="self-end xl:col-start-5">
           <button
             type="submit"
-            className={`w-full rounded-xl px-3 py-2.5 text-xs font-bold transition-colors ${
+            disabled={isSaving}
+            aria-busy={isSaving}
+            className={`flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-colors disabled:cursor-wait disabled:opacity-70 ${
               isFormDirty
                 ? 'bg-emerald-400 text-slate-950 ring-2 ring-emerald-300/40 hover:bg-emerald-300'
                 : themeStyle.btn
             }`}
           >
-            {editingId ? t.salvar : t.adicionar}
+            {isSaving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            {isSaving ? t.assetSaving : editingId ? t.salvar : t.adicionar}
           </button>
         </div>
       </form>

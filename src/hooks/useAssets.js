@@ -11,6 +11,11 @@ import {
 import { getSupplementaryDetails, mergeBackendAssets, toApiAsset } from '../utils/assetSync.js';
 
 const normalizeAssetList = (value) => Array.isArray(value) ? value : [];
+const getAssetErrorKey = (error, fallback) => {
+  if (error?.status === 401) return 'assetsLoginError';
+  if (error?.code === 'ASSET_REQUEST_TIMEOUT') return 'assetRequestTimeoutError';
+  return fallback;
+};
 let initialAssetsRequest = null;
 const PRICE_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 
@@ -167,7 +172,7 @@ export const useAssets = () => {
       if (localFallback.length > 0) {
         setAssets(localFallback);
       }
-      setError(loadError?.status === 401 ? 'assetsLoginError' : 'assetsLoadingError');
+      setError(getAssetErrorKey(loadError, 'assetsLoadingError'));
       return null;
     } finally {
       setIsLoading(false);
@@ -190,7 +195,7 @@ export const useAssets = () => {
       if (!savedDetails) setError('assetDetailsSaveError');
       return created;
     } catch (saveError) {
-      setError(saveError?.status === 401 ? 'assetsLoginError' : 'assetCreateError');
+      setError(getAssetErrorKey(saveError, 'assetCreateError'));
       return null;
     }
   }, []);
@@ -231,7 +236,7 @@ export const useAssets = () => {
       if (!savedDetails) setError('assetDetailsSaveError');
       return merged;
     } catch (saveError) {
-      setError(saveError?.status === 401 ? 'assetsLoginError' : 'assetUpdateError');
+      setError(getAssetErrorKey(saveError, 'assetUpdateError'));
       return null;
     }
   }, [assets]);
@@ -246,7 +251,7 @@ export const useAssets = () => {
       setAssets((current) => normalizeAssetList(current).filter((asset) => String(asset.id) !== String(assetId)));
       return true;
     } catch (deleteError) {
-      setError(deleteError?.status === 401 ? 'assetsLoginError' : 'assetDeleteError');
+      setError(getAssetErrorKey(deleteError, 'assetDeleteError'));
       return false;
     }
   }, []);
