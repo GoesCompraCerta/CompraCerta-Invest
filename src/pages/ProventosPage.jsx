@@ -256,16 +256,16 @@ export default function ProventosPage({
               <table className="w-full text-left text-xs">
                 <thead className={`${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   <tr className="border-b border-current/15">
-                    <th className="py-2 pr-2 font-semibold">{t.ticker}</th>
-                    <th className="py-2 px-2 text-right font-semibold">{t.totalRecebidoResumo}</th>
-                    <th className="py-2 pl-2 text-right font-semibold">{t.yieldOnCost}</th>
+                    <th className="whitespace-nowrap py-2 pr-2 text-left font-semibold">{t.tableHeaderAsset}</th>
+                    <th className="whitespace-nowrap py-2 px-2 text-right font-semibold tabular-nums">{t.tableHeaderReceived}</th>
+                    <th className="whitespace-nowrap py-2 pl-2 text-right font-semibold">{t.tableHeaderYield}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.resumoAtivos.map((item) => (
                     <tr key={item.ticker} className="border-b border-current/10 last:border-0">
-                      <td className="py-2 pr-2 font-bold">{item.ticker}</td>
-                      <td className="py-2 px-2 text-right whitespace-nowrap">
+                      <td className="py-2 pr-2 text-left font-bold">{item.ticker}</td>
+                      <td className="py-2 px-2 text-right whitespace-nowrap tabular-nums">
                         {privacyMode ? 'R$ ***' : formatMoney(item.total_recebido)}
                       </td>
                       <td className={`py-2 pl-2 text-right whitespace-nowrap ${themeStyle.text}`}>
