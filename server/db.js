@@ -143,7 +143,7 @@ const initializeDatabase = async () => {
       qty DOUBLE,
       buy_price DOUBLE,
       buy_date DATE,
-      details JSON NULL,
+      details TEXT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT fk_assets_user_id FOREIGN KEY (user_id) REFERENCES users(id)
     ) ENGINE=InnoDB
@@ -196,7 +196,7 @@ const initializeDatabase = async () => {
       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'assets' AND COLUMN_NAME = 'details'
     `);
     if (detailsColumn.length === 0) {
-      await db.execute('ALTER TABLE assets ADD COLUMN details JSON NULL');
+      await db.execute('ALTER TABLE assets ADD COLUMN details TEXT NULL');
     }
     await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['assets_details_v1']);
   }
