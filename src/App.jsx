@@ -81,12 +81,13 @@ export default function App() {
       setIsAuthenticated(false);
       setPlanStatus(null);
       setIsTrialExpired(false);
+      setPositionView('overview');
       setIsAuthChecking(false);
       return () => { isMounted = false; };
     }
 
     authService.getMe()
-      .then(async () => {
+      .then(async (profile) => {
         let status = null;
         try {
           status = await authService.getPlanStatus();
@@ -94,6 +95,7 @@ export default function App() {
           if (error.status === 401) throw error;
         }
         if (isMounted) {
+          setPositionView(profile.user?.position_view === 'class' ? 'class' : 'overview');
           setPlanStatus(status);
           const trialExpired = status?.plan === 'trial' && status.daysRemaining <= 0;
           setIsTrialExpired(trialExpired);
@@ -106,6 +108,7 @@ export default function App() {
         if (isMounted) {
           setIsAuthenticated(false);
           setIsTrialExpired(false);
+          setPositionView('overview');
         }
       })
       .finally(() => { if (isMounted) setIsAuthChecking(false); });
@@ -144,6 +147,7 @@ export default function App() {
   // ── UI State ─────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [positionView, setPositionView] = useState('overview');
   const [pieRadiusLevel, setPieRadiusLevel] = useState(() => {
     try {
       const savedLevel = Number(localStorage.getItem('goes_compra_certa_chart_size'));
@@ -175,6 +179,11 @@ export default function App() {
     }
   };
 
+  const savePositionView = useCallback(async (view) => {
+    const profile = await authService.updatePositionView(view);
+    setPositionView(profile.user?.position_view === 'class' ? 'class' : 'overview');
+  }, []);
+
   useEffect(() => {
     if (!isAuthChecking && isAuthenticated && (pathname === '/login' || pathname === '/register')) {
       navigateTo('/');
@@ -188,6 +197,8 @@ export default function App() {
     refreshAssets();
     let trialExpired = false;
     try {
+      const profile = await authService.getMe();
+      setPositionView(profile.user?.position_view === 'class' ? 'class' : 'overview');
       const status = await authService.getPlanStatus();
       setPlanStatus(status);
       trialExpired = status?.plan === 'trial' && status.daysRemaining <= 0;
@@ -196,6 +207,7 @@ export default function App() {
     } catch {
       setPlanStatus(null);
       setIsTrialExpired(false);
+      setPositionView('overview');
     } finally {
       setIsAuthChecking(false);
       navigateTo(isTrialExpired ? '/trial-expired' : '/');
@@ -389,6 +401,8 @@ export default function App() {
             lang={lang}
             pieRadiusLevel={pieRadiusLevel}
             setPieRadiusLevel={savePieRadiusLevel}
+            positionView={positionView}
+            onPositionViewChange={savePositionView}
             privacyMode={privacyMode}
             setPrivacyMode={setPrivacyMode}
             t={t}

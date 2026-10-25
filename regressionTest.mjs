@@ -25,6 +25,7 @@ import {
   listProventos,
   updateProvento as updateProventoRequest
 } from './src/services/proventosService.js';
+import { updatePositionView } from './src/services/authService.js';
 
 const tests = [];
 
@@ -63,6 +64,44 @@ addTest(
       && toStoredDate('22/10/2026') === '2026-10-22'
       && toStoredDate('2026-02-30') === ''
       && toStoredDate('data inválida') === '';
+  }
+);
+
+addTest(
+  'Preferência de visão do resumo é enviada à API autenticada',
+  {},
+  'PUT /api/auth/preferences persiste a visão selecionada',
+  async () => {
+    const originalFetch = globalThis.fetch;
+    const originalLocalStorage = globalThis.localStorage;
+    let requestPath;
+    let requestOptions;
+
+    globalThis.localStorage = { getItem: () => 'test-token' };
+    globalThis.fetch = async (path, options) => {
+      requestPath = path;
+      requestOptions = options;
+      return {
+        ok: true,
+        json: async () => ({ user: { position_view: 'class' } })
+      };
+    };
+
+    try {
+      const response = await updatePositionView('class');
+      return requestPath === '/api/auth/preferences'
+        && requestOptions.method === 'PUT'
+        && requestOptions.headers.Authorization === 'Bearer test-token'
+        && JSON.parse(requestOptions.body).position_view === 'class'
+        && response.user.position_view === 'class';
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalLocalStorage === undefined) {
+        delete globalThis.localStorage;
+      } else {
+        globalThis.localStorage = originalLocalStorage;
+      }
+    }
   }
 );
 
@@ -452,6 +491,9 @@ addTest(
       pm: 20,
       buyDate: '2026-10-19',
       metaPercent: 25,
+      vacancia: 5.5,
+      pVpAjustado: 0.92,
+      capRate: 8.1,
       price: 30
     });
     const hydratedAsset = mergeBackendAssets([{
@@ -462,6 +504,7 @@ addTest(
       buyPrice: apiPayload.buyPrice,
       buyDate: apiPayload.buyDate,
       meta: apiPayload.meta,
+      details: apiPayload.details,
       price: apiPayload.price
     }], {})[0];
     const totals = calculatePortfolioTotals([hydratedAsset], []);
@@ -478,9 +521,15 @@ addTest(
     }], { 18: { metaPercent: 25, price: 30 } })[0];
 
     return apiPayload.meta === 25
+      && apiPayload.details.vacancia === 5.5
+      && apiPayload.details.pVpAjustado === 0.92
+      && apiPayload.details.capRate === 8.1
       && apiPayload.price === 30
       && hydratedAsset.meta === 25
       && hydratedAsset.metaPercent === 25
+      && hydratedAsset.vacancia === 5.5
+      && hydratedAsset.pVpAjustado === 0.92
+      && hydratedAsset.capRate === 8.1
       && asset.qty === 3
       && asset.pm === 20
       && asset.price === 30

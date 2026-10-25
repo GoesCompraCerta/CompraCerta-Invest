@@ -12,6 +12,8 @@ export default function DashboardPage({
   lang,
   pieRadiusLevel,
   setPieRadiusLevel,
+  positionView,
+  onPositionViewChange,
   privacyMode,
   t
 }) {
@@ -34,6 +36,8 @@ export default function DashboardPage({
           cardClass={cardClass}
           lang={lang}
           privacyMode={privacyMode}
+          view={positionView}
+          onViewChange={onPositionViewChange}
           t={t}
         />
       </div>

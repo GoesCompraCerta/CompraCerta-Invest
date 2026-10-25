@@ -29,6 +29,7 @@ import {
   updateAssetPricesByUserId,
   updateProventoById,
   updateUserPlan,
+  updateUserPositionView,
   setMarketCache
 } from './server/db.js';
 import { assertJwtSecret, generateToken, hashPassword, requireAuth, verifyPassword } from './server/auth.js';
@@ -155,7 +156,8 @@ const toPublicUser = (user) => ({
   name: user.name,
   email: user.email,
   plan: user.plan,
-  plan_expires_at: user.plan_expires_at
+  plan_expires_at: user.plan_expires_at,
+  position_view: user.position_view || 'overview'
 });
 
 const handleAuthRegister = async (request, response) => {
@@ -312,6 +314,35 @@ const handleAuthMe = async (request, response) => {
   const user = await getUserById(userId);
   if (!user) {
     sendJson(response, 401, { error: 'Usuário não encontrado.' });
+    return;
+  }
+  sendJson(response, 200, { user: toPublicUser(user) });
+};
+
+const handleUpdateAuthPreferences = async (request, response) => {
+  const userId = requireAuth(request);
+  if (!userId) {
+    sendJson(response, 401, { error: 'Autenticação necessária.' });
+    return;
+  }
+
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const positionView = payload?.position_view;
+  if (!['overview', 'class'].includes(positionView)) {
+    sendJson(response, 400, { error: 'A visão de posicionamento informada é inválida.' });
+    return;
+  }
+
+  const user = await updateUserPositionView(userId, positionView);
+  if (!user) {
+    sendJson(response, 404, { error: 'Usuário não encontrado.' });
     return;
   }
   sendJson(response, 200, { user: toPublicUser(user) });
@@ -575,6 +606,7 @@ const toPublicAsset = (asset) => ({
   buyPrice: asset.buy_price,
   buyDate: asset.buy_date,
   meta: asset.meta == null ? null : Number(asset.meta),
+  details: asset.details || {},
   price: asset.price == null ? null : Number(asset.price),
   price_updated_at: asset.price_updated_at || null
 });
@@ -618,18 +650,20 @@ const readAndValidateAsset = async (request, response) => {
   const buyDate = payload?.buyDate;
   const meta = payload?.meta == null || payload.meta === '' ? null : Number(payload.meta);
   const price = payload?.price == null || payload.price === '' ? null : Number(payload.price);
+  const details = payload?.details == null ? {} : payload.details;
 
   if (!ticker || !Number.isFinite(qty) || qty <= 0
     || payload?.buyPrice === '' || payload?.buyPrice == null
     || !Number.isFinite(buyPrice) || buyPrice < 0
     || (meta !== null && (!Number.isFinite(meta) || meta < 0 || meta > 100))
     || (price !== null && (!Number.isFinite(price) || price <= 0))
+    || typeof details !== 'object' || Array.isArray(details)
     || !isValidIsoDate(buyDate)) {
     sendJson(response, 400, { error: 'Informe ticker, quantidade positiva, preços válidos, meta entre 0 e 100 e data YYYY-MM-DD.' });
     return null;
   }
 
-  return { ticker, type: type || null, qty, buyPrice, buyDate, meta, price };
+  return { ticker, type: type || null, qty, buyPrice, buyDate, meta, price, details };
 };
 
 const handleListAssets = async (request, response) => {
@@ -1705,6 +1739,11 @@ const handleCoinGeckoRequest = async (request, response) => {
 
   if (request.method === 'GET' && request.url === '/api/auth/me') {
     handleAuthMe(request, response);
+    return;
+  }
+
+  if (request.method === 'PUT' && request.url === '/api/auth/preferences') {
+    handleUpdateAuthPreferences(request, response);
     return;
   }
 

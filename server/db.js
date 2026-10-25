@@ -129,7 +129,8 @@ const initializeDatabase = async () => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       trial_started_at VARCHAR(40),
       plan VARCHAR(50) DEFAULT 'trial',
-      plan_expires_at VARCHAR(40)
+      plan_expires_at VARCHAR(40),
+      position_view VARCHAR(16) NOT NULL DEFAULT 'overview'
     ) ENGINE=InnoDB
   `);
 
@@ -142,6 +143,7 @@ const initializeDatabase = async () => {
       qty DOUBLE,
       buy_price DOUBLE,
       buy_date DATE,
+      details JSON NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT fk_assets_user_id FOREIGN KEY (user_id) REFERENCES users(id)
     ) ENGINE=InnoDB
@@ -164,6 +166,40 @@ const initializeDatabase = async () => {
       applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB
   `);
+
+  const [userPreferencesMigration] = await db.execute(
+    'SELECT name FROM schema_migrations WHERE name = ?',
+    ['user_preferences_v1']
+  );
+  if (userPreferencesMigration.length === 0) {
+    const [positionViewColumn] = await db.execute(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'position_view'
+    `);
+    if (positionViewColumn.length === 0) {
+      await db.execute(
+        "ALTER TABLE users ADD COLUMN position_view VARCHAR(16) NOT NULL DEFAULT 'overview'"
+      );
+    }
+    await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['user_preferences_v1']);
+  }
+
+  const [assetDetailsMigration] = await db.execute(
+    'SELECT name FROM schema_migrations WHERE name = ?',
+    ['assets_details_v1']
+  );
+  if (assetDetailsMigration.length === 0) {
+    const [detailsColumn] = await db.execute(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'assets' AND COLUMN_NAME = 'details'
+    `);
+    if (detailsColumn.length === 0) {
+      await db.execute('ALTER TABLE assets ADD COLUMN details JSON NULL');
+    }
+    await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['assets_details_v1']);
+  }
 
   const [assetMetaMigration] = await db.execute(
     'SELECT name FROM schema_migrations WHERE name = ?',
@@ -320,6 +356,11 @@ export const getUserById = async (id) => {
   return rows[0];
 };
 
+export const updateUserPositionView = async (userId, positionView) => {
+  await db.execute('UPDATE users SET position_view = ? WHERE id = ?', [positionView, userId]);
+  return getUserById(userId);
+};
+
 export const createPasswordReset = async (userId, tokenHash, expiresAt) => {
   await db.execute(
     'INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)',
@@ -414,7 +455,7 @@ export const activateUserPlanFromWebhook = async (eventId, userId, planExpiresAt
 
 export const getAssetsByUserId = async (userId) => {
   const [rows] = await db.execute(`
-    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta,
+    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta, details,
       price, price_updated_at, created_at
     FROM assets
     WHERE user_id = ?
@@ -425,7 +466,7 @@ export const getAssetsByUserId = async (userId) => {
 
 export const getAssetById = async (assetId) => {
   const [rows] = await db.execute(`
-    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta,
+    SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta, details,
       price, price_updated_at, created_at
     FROM assets
     WHERE id = ?
@@ -445,7 +486,7 @@ export const updateAssetPricesByUserId = async (userId, updates) => {
       `, [price, id, userId]);
     }
     const [rows] = await connection.execute(`
-      SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta,
+      SELECT id, user_id, ticker, type, qty, buy_price, buy_date, meta, details,
         price, price_updated_at, created_at
       FROM assets
       WHERE user_id = ?
@@ -461,22 +502,22 @@ export const updateAssetPricesByUserId = async (userId, updates) => {
   }
 };
 
-export const createAsset = async ({ userId, ticker, type, qty, buyPrice, buyDate, meta, price }) => {
+export const createAsset = async ({ userId, ticker, type, qty, buyPrice, buyDate, meta, price, details }) => {
   const [result] = await db.execute(`
-    INSERT INTO assets (user_id, ticker, type, qty, buy_price, buy_date, meta, price, price_updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, IF(? IS NULL, NULL, CURRENT_TIMESTAMP))
-  `, [userId, ticker, type, qty, buyPrice, buyDate, meta, price, price]);
+    INSERT INTO assets (user_id, ticker, type, qty, buy_price, buy_date, meta, details, price, price_updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, IF(? IS NULL, NULL, CURRENT_TIMESTAMP))
+  `, [userId, ticker, type, qty, buyPrice, buyDate, meta, JSON.stringify(details || {}), price, price]);
   return getAssetById(result.insertId);
 };
 
-export const updateAssetById = async (assetId, { ticker, type, qty, buyPrice, buyDate, meta, price }) => {
+export const updateAssetById = async (assetId, { ticker, type, qty, buyPrice, buyDate, meta, price, details }) => {
   await db.execute(`
     UPDATE assets
-    SET ticker = ?, type = ?, qty = ?, buy_price = ?, buy_date = ?, meta = ?,
+    SET ticker = ?, type = ?, qty = ?, buy_price = ?, buy_date = ?, meta = ?, details = ?,
       price = COALESCE(?, price),
       price_updated_at = IF(? IS NULL, price_updated_at, CURRENT_TIMESTAMP)
     WHERE id = ?
-  `, [ticker, type, qty, buyPrice, buyDate, meta, price, price, assetId]);
+  `, [ticker, type, qty, buyPrice, buyDate, meta, JSON.stringify(details || {}), price, price, assetId]);
   return getAssetById(assetId);
 };
 

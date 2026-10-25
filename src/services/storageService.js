@@ -54,6 +54,16 @@ export const assetDetailsStorage = {
       console.error('Error saving supplementary asset details:', error);
       return false;
     }
+  },
+
+  clear: () => {
+    try {
+      localStorage.removeItem(ASSET_DETAILS_KEY);
+      return true;
+    } catch (error) {
+      console.error('Error clearing migrated supplementary asset details:', error);
+      return false;
+    }
   }
 };
 

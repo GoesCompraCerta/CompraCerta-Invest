@@ -12,9 +12,11 @@ export default function PositionSummary({
   cardClass,
   lang,
   privacyMode = false,
+  view,
+  onViewChange,
   t
 }) {
-  const [view, setView] = useState('overview');
+  const [preferenceError, setPreferenceError] = useState(false);
   const sortedAssets = useMemo(
     () => (Array.isArray(assets) ? [...assets] : []).sort((first, second) => Number(second.valorTotal) - Number(first.valorTotal)),
     [assets]
@@ -24,6 +26,16 @@ export default function PositionSummary({
   const renderAllocationPercent = (value) => (
     privacyMode ? '••••%' : `${Number(value || 0).toFixed(2)}%`
   );
+
+  const handleViewChange = async (nextView) => {
+    setPreferenceError(false);
+    try {
+      await onViewChange(nextView);
+    } catch (error) {
+      console.error('Position summary preference update failed:', error);
+      setPreferenceError(true);
+    }
+  };
 
   return (
     <div className={`w-full rounded-2xl border p-4 md:p-5 ${cardClass}`}>
@@ -37,7 +49,7 @@ export default function PositionSummary({
             key={value}
             type="button"
             aria-pressed={view === value}
-            onClick={() => setView(value)}
+            onClick={() => handleViewChange(value)}
             className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
               view === value
                 ? 'bg-emerald-500 text-slate-950'
@@ -48,6 +60,9 @@ export default function PositionSummary({
           </button>
         ))}
       </div>
+      {preferenceError && (
+        <p className="mb-3 text-xs text-rose-500" role="alert">{t.positionViewSaveError}</p>
+      )}
       <div className="app-scrollbar max-h-[400px] overflow-y-auto pr-1">
         {sortedAssets.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-500">{t.semDados}</div>

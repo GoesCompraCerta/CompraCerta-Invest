@@ -112,6 +112,29 @@ const importLegacyAssets = async (remoteAssets, legacyAssets, details) => {
   return importedAssets;
 };
 
+const migrateLocalAssetDetails = async (assets, localDetails) => {
+  const migratedAssets = [...assets];
+
+  for (let index = 0; index < migratedAssets.length; index += 1) {
+    const asset = migratedAssets[index];
+    const local = localDetails[String(asset.id)];
+    if (!local || typeof local !== 'object' || Array.isArray(local)) continue;
+
+    const backendAsset = mergeBackendAssets([asset])[0];
+    const backendDetails = getSupplementaryDetails(backendAsset);
+    const missingLocalFields = Object.fromEntries(
+      Object.entries(local).filter(([key]) => !(key in backendDetails))
+    );
+    if (Object.keys(missingLocalFields).length === 0) continue;
+
+    const details = { ...local, ...backendDetails };
+    const updated = await updateAsset(asset.id, toApiAsset({ ...backendAsset, ...details }));
+    migratedAssets[index] = updated;
+  }
+
+  return migratedAssets;
+};
+
 const loadBackendAssets = async () => {
   if (!initialAssetsRequest) {
     initialAssetsRequest = (async () => {
@@ -147,7 +170,11 @@ const loadBackendAssets = async () => {
           });
         }
       }
-      return mergeBackendAssets(pricedAssets, details);
+      const assetsWithDetails = await migrateLocalAssetDetails(pricedAssets, details);
+      if (Object.keys(details).length > 0 && !assetDetailsStorage.clear()) {
+        throw new Error('Os detalhes dos ativos foram sincronizados, mas não foi possível limpar a cópia local.');
+      }
+      return mergeBackendAssets(assetsWithDetails);
     })().finally(() => {
       initialAssetsRequest = null;
     });
@@ -187,12 +214,7 @@ export const useAssets = () => {
     setError('');
     try {
       const created = await createAsset(toApiAsset(newAsset));
-      const id = String(created.id);
-      const details = assetDetailsStorage.get();
-      details[id] = getSupplementaryDetails(newAsset);
-      const savedDetails = assetDetailsStorage.set(details);
-      setAssets((current) => [...normalizeAssetList(current), ...mergeBackendAssets([created], details)]);
-      if (!savedDetails) setError('assetDetailsSaveError');
+      setAssets((current) => [...normalizeAssetList(current), ...mergeBackendAssets([created])]);
       return created;
     } catch (saveError) {
       setError(getAssetErrorKey(saveError, 'assetCreateError'));
@@ -212,9 +234,6 @@ export const useAssets = () => {
     const updatedAsset = { ...currentAsset, ...assetUpdates };
     try {
       const saved = await updateAsset(assetId, toApiAsset(updatedAsset));
-      const details = assetDetailsStorage.get();
-      details[String(saved.id)] = getSupplementaryDetails(updatedAsset);
-      const savedDetails = assetDetailsStorage.set(details);
       let savedWithPrice = saved;
       const price = Number(updatedAsset.price);
       if (forcePriceUpdate && Number.isFinite(price) && price > 0) {
@@ -229,11 +248,10 @@ export const useAssets = () => {
           savedWithPrice = { ...saved, price };
         }
       }
-      const merged = mergeBackendAssets([savedWithPrice], details)[0];
+      const merged = mergeBackendAssets([savedWithPrice])[0];
       setAssets((current) => normalizeAssetList(current).map((asset) =>
         String(asset.id) === String(assetId) ? merged : asset
       ));
-      if (!savedDetails) setError('assetDetailsSaveError');
       return merged;
     } catch (saveError) {
       setError(getAssetErrorKey(saveError, 'assetUpdateError'));

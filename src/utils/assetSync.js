@@ -1,6 +1,6 @@
 const CORE_FIELDS = new Set([
   'id', 'user_id', 'ticker', 'type', 'qty', 'buyPrice', 'buy_price',
-  'buyDate', 'buy_date', 'created_at', 'meta', 'metaPercent', 'price_updated_at'
+  'buyDate', 'buy_date', 'created_at', 'meta', 'metaPercent', 'details', 'price_updated_at'
 ]);
 
 const getToday = () => new Date().toISOString().split('T')[0];
@@ -23,7 +23,8 @@ export const toApiAsset = (asset) => {
     buyPrice: Number(asset?.pm ?? asset?.buyPrice),
     buyDate: getLegacyBuyDate(asset),
     meta: meta == null || meta === '' ? null : Number(meta),
-    price: Number.isFinite(price) && price > 0 ? price : null
+    price: Number.isFinite(price) && price > 0 ? price : null,
+    details: getSupplementaryDetails(asset)
   };
 };
 
@@ -34,7 +35,14 @@ export const getSupplementaryDetails = (asset) => Object.fromEntries(
 export const mergeBackendAssets = (remoteAssets, details = {}) => (
   (Array.isArray(remoteAssets) ? remoteAssets : []).map((asset) => {
     const id = String(asset.id);
-    const extra = details[id] && typeof details[id] === 'object' ? details[id] : {};
+    const { details: backendDetailsValue, ...baseAsset } = asset;
+    const localExtra = details[id] && typeof details[id] === 'object' ? details[id] : {};
+    const backendExtra = typeof backendDetailsValue === 'string'
+      ? JSON.parse(backendDetailsValue || '{}')
+      : backendDetailsValue && typeof backendDetailsValue === 'object' && !Array.isArray(backendDetailsValue)
+        ? backendDetailsValue
+        : {};
+    const extra = { ...localExtra, ...backendExtra };
     const meta = asset.meta ?? extra.meta ?? extra.metaPercent;
     const supplementaryDetails = Object.fromEntries(
       Object.entries(extra).filter(([key]) => key !== 'meta' && key !== 'metaPercent')
@@ -42,7 +50,7 @@ export const mergeBackendAssets = (remoteAssets, details = {}) => (
 
     return {
       ...supplementaryDetails,
-      ...asset,
+      ...baseAsset,
       id,
       qty: Number(asset.qty) || 0,
       pm: Number(asset.buyPrice) || 0,
