@@ -273,6 +273,11 @@ export const getFiiIndicators = (asset) => {
   const selectedDy = getSelectedFiiDy(asset);
 
   return {
+    fiiCategory: asset?.fiiCategory === 'Papel' ? 'Papel' : 'Tijolo',
+    rating: asset?.rating || null,
+    ltv: readFiiNumber(asset?.ltv),
+    indexador: asset?.indexador || null,
+    spread: asset?.spread || null,
     currentPrice: readFiiNumber(asset?.price),
     recurringYield: readFiiNumber(asset?.dividendYieldRecorrente, asset?.dividendYield),
     adjustedPvp: readFiiNumber(asset?.pVpAjustado, asset?.pVp),
@@ -290,7 +295,110 @@ export const getFiiIndicators = (asset) => {
   };
 };
 
-export const calculateFiiMethods = (asset) => {
+export const calculatePaperReferenceRates = (cdiItems, ipcaItems) => {
+  const parseSeries = (items) => (Array.isArray(items) ? items : [])
+    .map((item) => ({
+      date: String(item?.data || '').split('/').reverse().join('-'),
+      value: readFiiNumber(item?.valor)
+    }))
+    .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.value !== null)
+    .sort((first, second) => first.date.localeCompare(second.date));
+
+  const cdiSeries = parseSeries(cdiItems);
+  const ipcaSeries = parseSeries(ipcaItems);
+  const latestCdiDailyRate = cdiSeries.length > 0
+    ? cdiSeries[cdiSeries.length - 1].value
+    : null;
+  const lastTwelveIpcaRates = ipcaSeries.slice(-12);
+
+  return {
+    CDI: latestCdiDailyRate === null
+      ? null
+      : (Math.pow(1 + latestCdiDailyRate / 100, 252) - 1) * 100,
+    IPCA: lastTwelveIpcaRates.length !== 12
+      ? null
+      : (lastTwelveIpcaRates.reduce(
+        (total, item) => total * (1 + item.value / 100),
+        1
+      ) - 1) * 100
+  };
+};
+
+const readSpreadPercent = (value) => {
+  const match = String(value ?? '').match(/-?\d+(?:[.,]\d+)?/);
+  return match ? readFiiNumber(match[0]) : null;
+};
+
+const calculatePaperFiiMethods = (indicators, referenceRates) => {
+  const rating = String(indicators.rating || '').trim().toUpperCase();
+  const ratingScore = rating === 'HIGH GRADE' || /^(AAA|AA|A|BBB)[+-]?$/.test(rating)
+    ? 10
+    : rating === 'HIGH YIELD' || /^(BB|B|CCC|CC|C|D)[+-]?$/.test(rating)
+      ? 5
+      : null;
+  const ltvAdjustment = indicators.ltv === null
+    ? null
+    : indicators.ltv < 50 ? 1 : indicators.ltv > 80 ? -1 : 0;
+  const securityScore = ratingScore === null || ltvAdjustment === null
+    ? null
+    : Math.max(0, Math.min(10, ratingScore + ltvAdjustment));
+  const bastter = securityScore === null ? null : {
+    score: securityScore,
+    color: securityScore >= 8 ? 'green' : securityScore >= 5 ? 'yellow' : 'rose',
+    statusKey: securityScore >= 8 ? 'fiiPaperSafe' : securityScore >= 5 ? 'fiiPaperAttention' : 'fiiPaperRisk',
+    approved: securityScore >= 8
+  };
+
+  const indexador = String(indicators.indexador || '').trim().toUpperCase();
+  const spread = readSpreadPercent(indicators.spread);
+  const referenceRate = indexador === 'PREFIXADO'
+    ? 0
+    : referenceRates?.[indexador];
+  const targetYield = spread === null
+    || (indexador !== 'PREFIXADO' && !Number.isFinite(referenceRate))
+    ? null
+    : referenceRate + spread;
+  const recurringYield = indicators.recurringYield;
+  const normalizedYield = recurringYield === null
+    ? null
+    : recurringYield > 1 ? recurringYield / 100 : recurringYield;
+  const annualDividend = indicators.currentPrice !== null && normalizedYield !== null
+    ? indicators.currentPrice * normalizedYield
+    : null;
+  const ceiling = annualDividend !== null && targetYield > 0
+    ? annualDividend / (targetYield / 100)
+    : null;
+  const baragiola = ceiling === null || indicators.currentPrice === null
+    ? null
+    : {
+        value: ceiling,
+        targetYield,
+        color: indicators.currentPrice <= ceiling ? 'green' : 'rose',
+        statusKey: indicators.currentPrice <= ceiling ? 'fiiStatusAbaixoTeto' : 'fiiStatusAcimaTeto',
+        approved: indicators.currentPrice <= ceiling
+      };
+
+  const meetsLiquidity = indicators.dailyLiquidity !== null
+    && indicators.dailyLiquidity > 500000;
+  const meetsPatrimony = indicators.realPatrimony !== null
+    && indicators.realPatrimony > 1_000_000_000;
+  const caetano = indicators.dailyLiquidity === null || indicators.realPatrimony === null
+    ? null
+    : {
+        color: meetsLiquidity && meetsPatrimony ? 'green' : 'yellow',
+      statusKey: meetsLiquidity && meetsPatrimony ? 'fiiPaperEfficient' : 'fiiPaperAttention',
+        approved: meetsLiquidity && meetsPatrimony
+      };
+
+  return { bastter, baragiola, caetano };
+};
+
+export const calculateFiiMethods = (asset, referenceRates = {}) => {
+  const indicators = getFiiIndicators(asset);
+  if (indicators.fiiCategory === 'Papel') {
+    return calculatePaperFiiMethods(indicators, referenceRates);
+  }
+
   const {
     currentPrice,
     recurringYield,
@@ -301,7 +409,7 @@ export const calculateFiiMethods = (asset) => {
     selectedDyValue,
     concentrationRate,
     dailyLiquidity
-  } = getFiiIndicators(asset);
+  } = indicators;
   const referenceRate = capRate !== null && capRate > 0 ? capRate / 100 : null;
   const yieldValue = selectedDyValue ?? recurringYield ?? null;
   const normalizedYield = yieldValue !== null

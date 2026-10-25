@@ -2,6 +2,8 @@ import {
   calculatePortfolioTotals,
   calculateMasterMethods,
   calculateFiiMethods,
+  calculatePaperReferenceRates,
+  getFiiIndicators,
   getSelectedFiiDy
 } from './src/services/calculationService.js';
 import { mergeBackendAssets, toApiAsset } from './src/utils/assetSync.js';
@@ -352,6 +354,170 @@ addTest(
     capRate: 8,
     concentracao: 'baixa'
   }).caetano === null
+);
+
+addTest(
+  'Taxas de referência de Papel anualizam CDI e acumulam 12 meses de IPCA',
+  {},
+  'CDI diário composto em 252 dias úteis e IPCA mensal composto em 12 meses',
+  () => {
+    const cdiRate = calculatePaperReferenceRates(
+      [{ data: '24/10/2026', valor: '0,04' }],
+      Array.from({ length: 12 }, (_, index) => ({
+        data: `${String(index + 1).padStart(2, '0')}/01/2026`,
+        valor: '0,5'
+      }))
+    );
+    return approximately(cdiRate.CDI, (Math.pow(1.0004, 252) - 1) * 100)
+      && approximately(cdiRate.IPCA, (Math.pow(1.005, 12) - 1) * 100);
+  }
+);
+
+addTest(
+  'Bastter de Papel pontua Rating e ajusta LTV entre 0 e 10',
+  {},
+  'High Grade/AAA com LTV baixo pontua 10; High Yield/BB com LTV alto pontua 4',
+  () => {
+    const safe = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      rating: 'High Grade',
+      ltv: 45
+    }).bastter;
+    const risk = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      rating: 'BB',
+      ltv: 85
+    }).bastter;
+    const legacyHighGrade = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      rating: 'AAA',
+      ltv: 50
+    }).bastter;
+    const highYield = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      rating: 'High Yield',
+      ltv: 50
+    }).bastter;
+    const missingRating = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      ltv: 45
+    }).bastter;
+
+    return safe?.score === 10
+      && safe.color === 'green'
+      && safe.statusKey === 'fiiPaperSafe'
+      && risk?.score === 4
+      && risk.color === 'rose'
+      && risk.statusKey === 'fiiPaperRisk'
+      && legacyHighGrade?.score === 10
+      && highYield?.score === 5
+      && missingRating === null;
+  }
+);
+
+addTest(
+  'Baragiola de Papel calcula teto em reais com CDI ou IPCA e Spread',
+  {},
+  'DY anual dividido pela taxa-alvo produz teto comparável à cotação',
+  () => {
+    const cdiResult = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      price: 100,
+      dividendYieldRecorrente: 12,
+      indexador: 'CDI',
+      spread: 'CDI + 2%'
+    }, { CDI: 10 }).baragiola;
+    const ipcaResult = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      price: 130,
+      dividendYieldRecorrente: 8,
+      indexador: 'IPCA',
+      spread: 'IPCA + 6%'
+    }, { IPCA: 4 }).baragiola;
+    const missingReference = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      price: 100,
+      dividendYieldRecorrente: 12,
+      indexador: 'CDI',
+      spread: 'CDI + 2%'
+    }).baragiola;
+
+    return cdiResult !== null
+      && approximately(cdiResult.targetYield, 12)
+      && approximately(cdiResult.value, 100)
+      && cdiResult.color === 'green'
+      && ipcaResult !== null
+      && approximately(ipcaResult.targetYield, 10)
+      && approximately(ipcaResult.value, 104)
+      && ipcaResult.color === 'rose'
+      && missingReference === null;
+  }
+);
+
+addTest(
+  'Caetano de Papel usa Liquidez e Patrimônio sem consultar Tijolo',
+  {},
+  'ambos acima dos limites é Eficiente; um limite baixo é Atenção',
+  () => {
+    const efficient = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      liquidezDiaria: 500001,
+      patrimonioReal: 1_000_000_001,
+      vacancia: 99,
+      capRate: 0,
+      concentracao: 'alta'
+    }).caetano;
+    const attention = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      liquidezDiaria: 500000,
+      patrimonioReal: 1_000_000_001
+    }).caetano;
+    const missingData = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      liquidezDiaria: 600000
+    }).caetano;
+
+    return efficient?.color === 'green'
+      && efficient.statusKey === 'fiiPaperEfficient'
+      && attention?.color === 'yellow'
+      && attention.statusKey === 'fiiPaperAttention'
+      && missingData === null;
+  }
+);
+
+addTest(
+  'Indicadores de Papel não substituem os cálculos de Tijolo',
+  {},
+  'categoria Tijolo mantém os métodos tradicionais mesmo com dados de Papel',
+  () => {
+    const traditional = calculateFiiMethods({
+      price: 100,
+      dividendYieldRecorrente: 8,
+      pVpAjustado: 0.9,
+      alavancagem: 8,
+      capRate: 8,
+      vacancia: 5,
+      concentracao: 'baixa',
+      liquidezDiaria: 100000
+    });
+    const withPaperFields = calculateFiiMethods({
+      fiiCategory: 'Tijolo',
+      rating: 'CCC',
+      ltv: 95,
+      indexador: 'IPCA',
+      spread: 'IPCA + 20%',
+      price: 100,
+      dividendYieldRecorrente: 8,
+      pVpAjustado: 0.9,
+      alavancagem: 8,
+      capRate: 8,
+      vacancia: 5,
+      concentracao: 'baixa',
+      liquidezDiaria: 100000
+    });
+
+    return JSON.stringify(withPaperFields) === JSON.stringify(traditional);
+  }
 );
 
 addTest(

@@ -53,6 +53,24 @@ const COMMON_FIELDS = [
   ['price', 'cotacao', '', 'number'], ['meta', 'meta', '', 'number']
 ];
 
+const PAPER_FIELDS = [
+  ['rating', 'Rating', '', 'select'],
+  ['ltv', 'LTV (%)', ''],
+  ['indexador', 'Indexador', '', 'select'],
+  ['spread', 'Spread', '', 'text']
+];
+
+const getRatingOptionValue = (value) => {
+  const rating = String(value || '').trim().toUpperCase();
+  if (rating === 'HIGH GRADE' || /^(AAA|AA|A|BBB)[+-]?$/.test(rating)) {
+    return 'High Grade';
+  }
+  if (rating === 'HIGH YIELD' || /^(BB|B|CCC|CC|C|D)[+-]?$/.test(rating)) {
+    return 'High Yield';
+  }
+  return '';
+};
+
 const isForeignAsset = (type) => [
   'Internacional', 'REIT', 'ETF Internacional',
   'Ações (EUA / Globais)', 'REITs (EUA / Globais)', 'ETFs (EUA / Globais)'
@@ -76,6 +94,20 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
   const displayCurrency = (formData.moeda || 'USD').toUpperCase();
   const averagePriceCurrency = pmAlreadyInBrl ? 'BRL' : displayCurrency;
   const currentPriceCurrency = priceAlreadyInBrl ? 'BRL' : displayCurrency;
+  const fiiAsset = formData.type === 'FIIs (B3)';
+  const fiiCategory = formData.fiiCategory === 'Papel' ? 'Papel' : 'Tijolo';
+  const conditionalFields = (CONDITIONAL_FIELDS[formData.type] || []).filter(
+    ([field]) => !fiiAsset || fiiCategory !== 'Papel' || [
+      'dividendYieldRecorrente',
+      'dyHistorico12M',
+      'liquidezDiaria',
+      'patrimonioReal'
+    ].includes(field)
+  );
+  const displayedFields = [
+    ...conditionalFields,
+    ...(fiiAsset && fiiCategory === 'Papel' ? PAPER_FIELDS : [])
+  ];
 
   const handleDateChange = (event) => {
     const digits = event.target.value.replace(/\D/g, '').slice(0, 8);
@@ -204,8 +236,31 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
         className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 [&>div]:min-w-0"
       >
         <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">{t.tipo}</label>
-          <select value={formData.type} onChange={(event) => handleTypeChange(event.target.value)} className="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+          <div className="flex items-center justify-between gap-2">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">{t.tipo}</label>
+            {fiiAsset && (
+              <div className="flex items-center gap-1 rounded-md border border-slate-800 bg-slate-950 p-0.5 shrink-0" role="group" aria-label="Categoria do FII">
+                {['Tijolo', 'Papel'].map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    aria-pressed={fiiCategory === category}
+                    onClick={() => handleChange('fiiCategory', category)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-black leading-none transition-all ${
+                      fiiCategory === category ? themeStyle.btn : 'text-slate-500'
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <select
+            value={formData.type}
+            onChange={(event) => handleTypeChange(event.target.value)}
+            className="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+          >
             {ASSET_TYPES.map((type) => <option key={type} value={type}>{t[TYPE_LABELS[type]]}</option>)}
           </select>
         </div>
@@ -238,7 +293,40 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
           />
         </div>
         {COMMON_FIELDS.slice(3).map(renderField)}
-        {(CONDITIONAL_FIELDS[formData.type] || []).map((fieldConfig) => {
+        {displayedFields.map((fieldConfig) => {
+          if (fieldConfig[0] === 'rating') {
+            return (
+              <div key="rating">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Rating</label>
+                <select
+                  value={getRatingOptionValue(formData.rating)}
+                  onChange={(event) => handleChange('rating', event.target.value)}
+                  className="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                >
+                  <option value="">--</option>
+                  <option value="High Grade">High Grade (Grau de Investimento)</option>
+                  <option value="High Yield">High Yield (Grau Especulativo)</option>
+                </select>
+              </div>
+            );
+          }
+          if (fieldConfig[0] === 'indexador') {
+            return (
+              <div key="indexador">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Indexador</label>
+                <select
+                  value={formData.indexador ?? ''}
+                  onChange={(event) => handleChange('indexador', event.target.value)}
+                  className="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                >
+                  <option value="">--</option>
+                  <option value="CDI">CDI</option>
+                  <option value="IPCA">IPCA</option>
+                  <option value="Prefixado">Prefixado</option>
+                </select>
+              </div>
+            );
+          }
           if (['FIIs (B3)', 'REITs (EUA / Globais)'].includes(formData.type) && fieldConfig[0] === 'dividendYieldRecorrente') {
             return renderFiiRecurringYieldField();
           }

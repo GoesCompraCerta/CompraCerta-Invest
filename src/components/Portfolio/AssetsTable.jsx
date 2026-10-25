@@ -66,6 +66,10 @@ const DETAIL_METRIC_TRANSLATIONS = {
   'DY Recorrente': 'fiiRecurringYieldShort',
   'P/VP Ajustado': 'fiiAdjustedPvp',
   Vacância: 'fiiVacancy',
+  Rating: 'fiiRating',
+  LTV: 'fiiLtv',
+  Indexador: 'fiiIndexador',
+  Spread: 'fiiSpread',
   'Liquidez Diária': 'fiiDailyLiquidity',
   Alavancagem: 'fiiLeverage',
   Concentração: 'fiiConcentration',
@@ -115,17 +119,30 @@ const detailMetricsForItem = (item) => {
   if (isFii(item.type)) {
     const fiiDy = getFiiDyCard(item);
 
-    metrics.push(
-      ['DY Recorrente', item.dividendYieldRecorrente],
-      ['P/VP Ajustado', item.pVpAjustado],
-      ['Vacância', item.vacancia],
-      ['Cap Rate', item.capRate],
-      ['Liquidez Diária', item.liquidezDiaria],
-      ['Alavancagem', item.alavancagem],
-      ['Concentração', item.concentracao],
-      [fiiDy.label, fiiDy.value],
-      ['Patrimônio Real', item.patrimonioReal]
-    );
+    if (item.fiiCategory === 'Papel') {
+      metrics.push(
+        ['DY Recorrente', item.dividendYieldRecorrente],
+        ['Liquidez Diária', item.liquidezDiaria],
+        [fiiDy.label, fiiDy.value],
+        ['Patrimônio Real', item.patrimonioReal],
+        ['Rating', item.rating],
+        ['LTV', item.ltv],
+        ['Indexador', item.indexador],
+        ['Spread', item.spread]
+      );
+    } else {
+      metrics.push(
+        ['DY Recorrente', item.dividendYieldRecorrente],
+        ['P/VP Ajustado', item.pVpAjustado],
+        ['Vacância', item.vacancia],
+        ['Cap Rate', item.capRate],
+        ['Liquidez Diária', item.liquidezDiaria],
+        ['Alavancagem', item.alavancagem],
+        ['Concentração', item.concentracao],
+        [fiiDy.label, fiiDy.value],
+        ['Patrimônio Real', item.patrimonioReal]
+      );
+    }
   }
 
   if (isFixedIncome(item.type)) {
@@ -147,7 +164,7 @@ const formatDetailValue = (key, value, t, lang) => {
 
   if ([
     'DY', 'DY Recorrente', 'DY 12M', 'DY 24M', 'ROE', 'ROIC', 'Tx. Cresc.', 'Vacância', 'Alavancagem',
-    'Cap Rate', 'Taxa de Rentabilidade', 'Concentração'
+    'Cap Rate', 'Taxa de Rentabilidade', 'Concentração', 'LTV'
   ].includes(key)) {
     return formatPercent(value);
   }

@@ -89,6 +89,11 @@ export default function PortfolioPage({
     dividendo24m: '',
     taxaRentabilidade: '',
     dataVencimento: '',
+    fiiCategory: 'Tijolo',
+    rating: '',
+    ltv: '',
+    indexador: '',
+    spread: '',
     meta: ''
   });
 
@@ -153,6 +158,13 @@ export default function PortfolioPage({
     const updated = {
       ticker: formData.ticker.toUpperCase(),
       type: formData.type,
+      ...(formData.type === 'FIIs (B3)' ? {
+        fiiCategory: formData.fiiCategory || 'Tijolo',
+        rating: (formData.rating || '').trim() || null,
+        ltv: parseOptionalNumber(formData.ltv),
+        indexador: formData.indexador || null,
+        spread: (formData.spread || '').trim() || null
+      } : {}),
       moeda: formData.moeda || null,
       qty: quantity,
       pm: finalPm,
@@ -237,6 +249,11 @@ export default function PortfolioPage({
       dividendo24m: '',
       taxaRentabilidade: '',
       dataVencimento: '',
+      fiiCategory: 'Tijolo',
+      rating: '',
+      ltv: '',
+      indexador: '',
+      spread: '',
       meta: '10'
     });
   };
@@ -308,6 +325,11 @@ export default function PortfolioPage({
       dividendo24m: String(item.dividendo24m ?? ''),
       taxaRentabilidade: String(item.taxaRentabilidade ?? ''),
       dataVencimento: item.dataVencimento ?? '',
+      fiiCategory: item.fiiCategory || 'Tijolo',
+      rating: item.rating ?? '',
+      ltv: String(item.ltv ?? ''),
+      indexador: item.indexador ?? '',
+      spread: item.spread ?? '',
       meta: String(item.meta ?? item.metaPercent ?? 10)
     });
     setLoadingEditAssetId(null);
@@ -355,6 +377,11 @@ export default function PortfolioPage({
       dividendo24m: '',
       taxaRentabilidade: '',
       dataVencimento: '',
+      fiiCategory: 'Tijolo',
+      rating: '',
+      ltv: '',
+      indexador: '',
+      spread: '',
       meta: '10'
     });
   };

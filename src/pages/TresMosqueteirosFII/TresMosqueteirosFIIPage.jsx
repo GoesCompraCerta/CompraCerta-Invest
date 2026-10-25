@@ -1,7 +1,12 @@
 import React from 'react';
 import { Building2 } from 'lucide-react';
 import MethodCard from '../../components/Common/MethodCard';
-import { calculateFiiMethods, getFiiIndicators, getSelectedFiiDy } from '../../services/calculationService';
+import {
+  calculateFiiMethods,
+  calculatePaperReferenceRates,
+  getFiiIndicators,
+  getSelectedFiiDy
+} from '../../services/calculationService';
 import { ASSET_TYPE_TRANSLATION_KEYS } from '../../constants/translations';
 
 export default function ThreeMusketeersPage({
@@ -30,6 +35,60 @@ export default function ThreeMusketeersPage({
   const fiiAssets = (assets || []).filter((asset) => (
     asset.type === 'FII' || asset.type === 'FIIs' || asset.type === 'FIIs (B3)' || asset.type === 'Fundo Imobiliário' || asset.type === 'REITs (EUA / Globais)'
   ));
+  const hasPaperFiis = fiiAssets.some((asset) => asset.fiiCategory === 'Papel');
+  const [referenceRates, setReferenceRates] = React.useState({});
+  const [referenceRateError, setReferenceRateError] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!hasPaperFiis) {
+      setReferenceRates({});
+      setReferenceRateError(false);
+      return undefined;
+    }
+
+    let active = true;
+    const endDate = new Date();
+    const startDate = new Date(endDate);
+    startDate.setUTCMonth(startDate.getUTCMonth() - 18);
+    const formatBcbDate = (date) => [
+      String(date.getUTCDate()).padStart(2, '0'),
+      String(date.getUTCMonth() + 1).padStart(2, '0'),
+      date.getUTCFullYear()
+    ].join('/');
+    const query = `startDate=${encodeURIComponent(formatBcbDate(startDate))}`
+      + `&endDate=${encodeURIComponent(formatBcbDate(endDate))}`;
+
+    const fetchSeries = async (series) => {
+      const response = await fetch(`/api/bcb?series=${series}&${query}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || `Falha ao consultar série BCB ${series}`);
+      }
+      return payload.data;
+    };
+
+    Promise.allSettled([fetchSeries('12'), fetchSeries('433')])
+      .then(([cdiResult, ipcaResult]) => {
+        if (!active) return;
+
+        const cdiItems = cdiResult.status === 'fulfilled' ? cdiResult.value : [];
+        const ipcaItems = ipcaResult.status === 'fulfilled' ? ipcaResult.value : [];
+        if (cdiResult.status === 'rejected') {
+          console.error('Não foi possível carregar a série CDI do BCB:', cdiResult.reason);
+        }
+        if (ipcaResult.status === 'rejected') {
+          console.error('Não foi possível carregar a série IPCA do BCB:', ipcaResult.reason);
+        }
+        setReferenceRates(calculatePaperReferenceRates(cdiItems, ipcaItems));
+        setReferenceRateError(
+          cdiResult.status === 'rejected' || ipcaResult.status === 'rejected'
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [hasPaperFiis]);
 
   return (
     <section className="w-full space-y-6">
@@ -42,6 +101,11 @@ export default function ThreeMusketeersPage({
           <p className="text-xs text-slate-400 mt-0.5">
             {t.fiiPageDescription}
           </p>
+          {referenceRateError && hasPaperFiis && (
+            <p role="status" className="mt-2 text-xs text-amber-400">
+              {t.benchmarkBcbWarning}
+            </p>
+          )}
         </div>
 
         {fiiAssets.length === 0 ? (
@@ -59,6 +123,11 @@ export default function ThreeMusketeersPage({
                 <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {row.map((asset) => {
                     const {
+                      fiiCategory,
+                      rating,
+                      ltv,
+                      indexador,
+                      spread,
                       currentPrice,
                       recurringYield,
                       adjustedPvp,
@@ -69,12 +138,13 @@ export default function ThreeMusketeersPage({
                       realPatrimony,
                       dailyLiquidity
                     } = getFiiIndicators(asset);
+                    const paperFii = fiiCategory === 'Papel';
                     const selectedDy = getSelectedFiiDy(asset);
                     const activeDividendValue = selectedDy.value ?? null;
                     const activeDividendLabel = `${t.fiiDividendPrefix} ${selectedDy.period}`;
                     const precoAtual = currentPrice ?? 0;
 
-                    const methods = calculateFiiMethods ? calculateFiiMethods(asset) : {};
+                    const methods = calculateFiiMethods(asset, referenceRates);
                     const { bastter, baragiola, caetano } = methods;
 
                     return (
@@ -112,30 +182,59 @@ export default function ThreeMusketeersPage({
                             <span className="text-slate-400 block">{t.fiiRecurringYieldShort}</span>
                             <strong>{displayNumber(recurringYield, '%')}</strong>
                           </div>
-                          <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
-                            <span className="text-slate-400 block">{t.fiiAdjustedPvp}</span>
-                            <strong>{displayNumber(adjustedPvp)}</strong>
-                          </div>
-                          <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
-                            <span className="text-slate-400 block">{t.fiiVacancy}</span>
-                            <strong>{displayNumber(vacancy, '%')}</strong>
-                          </div>
-                          <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
-                            <span className="text-slate-400 block">{t.fiiCapRate}</span>
-                            <strong>{displayNumber(capRate, '%')}</strong>
-                          </div>
-                          <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
-                            <span className="text-slate-400 block">{t.fiiLeverage}</span>
-                            <strong>{displayNumber(leverage, '%')}</strong>
-                          </div>
+                          {!paperFii && (
+                            <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                              <span className="text-slate-400 block">{t.fiiAdjustedPvp}</span>
+                              <strong>{displayNumber(adjustedPvp)}</strong>
+                            </div>
+                          )}
+                          {paperFii ? (
+                            <>
+                              <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                                <span className="text-slate-400 block">{t.fiiRating}</span>
+                                <strong>{rating || '—'}</strong>
+                              </div>
+                              <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                                <span className="text-slate-400 block">{t.fiiLtv}</span>
+                                <strong>{displayNumber(ltv, '%')}</strong>
+                              </div>
+                              <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                                <span className="text-slate-400 block">{t.fiiIndexador}</span>
+                                <strong>{indexador || '—'}</strong>
+                              </div>
+                              <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                                <span className="text-slate-400 block">{t.fiiSpread}</span>
+                                <strong>{spread || '—'}</strong>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                                <span className="text-slate-400 block">{t.fiiVacancy}</span>
+                                <strong>{displayNumber(vacancy, '%')}</strong>
+                              </div>
+                              <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                                <span className="text-slate-400 block">{t.fiiCapRate}</span>
+                                <strong>{displayNumber(capRate, '%')}</strong>
+                              </div>
+                            </>
+                          )}
+                          {!paperFii && (
+                            <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                              <span className="text-slate-400 block">{t.fiiLeverage}</span>
+                              <strong>{displayNumber(leverage, '%')}</strong>
+                            </div>
+                          )}
                           <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
                             <span className="text-slate-400 block">{activeDividendLabel}</span>
                             <strong>{displayNumber(activeDividendValue, '%')}</strong>
                           </div>
-                          <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
-                            <span className="text-slate-400 block">{t.fiiConcentration}</span>
-                            <strong className="block truncate">{displayConcentration(concentration)}</strong>
-                          </div>
+                          {!paperFii && (
+                            <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                              <span className="text-slate-400 block">{t.fiiConcentration}</span>
+                              <strong className="block truncate">{displayConcentration(concentration)}</strong>
+                            </div>
+                          )}
                           <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
                             <span className="text-slate-400 block">{t.fiiPatrimony}</span>
                             <strong>{displayCurrencyShort(realPatrimony)}</strong>
@@ -149,8 +248,13 @@ export default function ThreeMusketeersPage({
                         <div className="w-full grid grid-cols-2 2xl:grid-cols-4 gap-3 items-start">
                           <MethodCard
                             title={t.fiiBastterTitle}
-                            subtitle={bastter ? `${t.fiiMethodSubtitlePvp}: ${bastter.pvp} | ${t.fiiLeverage}: ${displayNumber(leverage, '%')}` : null}
+                            subtitle={bastter
+                              ? paperFii
+                                ? `${t.fiiRating}: ${rating || '—'} | ${t.fiiLtv}: ${displayNumber(ltv, '%')} | ${bastter.score}/10`
+                                : `${t.fiiMethodSubtitlePvp}: ${bastter.pvp} | ${t.fiiLeverage}: ${displayNumber(leverage, '%')}`
+                              : null}
                             color={bastter ? bastter.color : null}
+                            statusText={paperFii && bastter ? t[bastter.statusKey] : undefined}
                             approvedText={t.fiiStatusApproved}
                             attentionText={t.fiiRiskAlert}
                             rejectedText={t.fiiStatusRejected}
@@ -159,23 +263,33 @@ export default function ThreeMusketeersPage({
                           />
                           <MethodCard
                             title={t.fiiBaragiolaTitle}
-                            subtitle={baragiola ? `${t.fiiCeiling}: ${formatMoney(baragiola.value)} | DY: ${displayNumber(recurringYield, '%')} | ${t.fiiCapRate}: ${displayNumber(capRate, '%')}` : null}
+                            subtitle={baragiola
+                              ? paperFii
+                                ? `${t.fiiCeiling}: ${formatMoney(baragiola.value)} | ${t.fiiTargetYield}: ${displayNumber(baragiola.targetYield, '%')}`
+                                : `${t.fiiCeiling}: ${formatMoney(baragiola.value)} | DY: ${displayNumber(recurringYield, '%')} | ${t.fiiCapRate}: ${displayNumber(capRate, '%')}`
+                              : null}
                             color={baragiola ? baragiola.color : null}
+                            statusText={paperFii && baragiola ? t[baragiola.statusKey] : undefined}
                             approvedText={t.fiiStatusAbaixoTeto}
                             attentionText={t.fiiNearCeiling}
                             rejectedText={t.fiiStatusAcimaTeto}
-                            insufficientText={
-                              capRate === null || capRate <= 0
+                            insufficientText={paperFii
+                              ? t.insufficientData
+                              : capRate === null || capRate <= 0
                                 ? t.fiiCapRateUnavailable
-                                : t.insufficientData
-                            }
+                                : t.insufficientData}
                             titleClassName="text-emerald-400"
                           />
                           <div className="col-span-1">
                             <MethodCard
                               title={t.fiiCaetanoTitle}
-                              subtitle={caetano ? `${t.fiiVacancy}: ${displayNumber(vacancy, '%')} | ${t.fiiCapRate}: ${displayNumber(capRate, '%')} | ${t.fiiConcentration}: ${displayConcentration(concentration)} | ${t.fiiDailyLiquidity}: ${displayCurrencyShort(dailyLiquidity)}` : null}
+                              subtitle={caetano
+                                ? paperFii
+                                  ? `${t.fiiDailyLiquidity}: ${displayCurrencyShort(dailyLiquidity)} | ${t.fiiPatrimony}: ${displayCurrencyShort(realPatrimony)}`
+                                  : `${t.fiiVacancy}: ${displayNumber(vacancy, '%')} | ${t.fiiCapRate}: ${displayNumber(capRate, '%')} | ${t.fiiConcentration}: ${displayConcentration(concentration)} | ${t.fiiDailyLiquidity}: ${displayCurrencyShort(dailyLiquidity)}`
+                                : null}
                               color={caetano ? caetano.color : null}
+                              statusText={paperFii && caetano ? t[caetano.statusKey] : undefined}
                               approvedText={t.fiiStatusHealthy}
                               attentionText={t.fiiVacancyAttention}
                               rejectedText={t.fiiCriticalVacancy}
