@@ -198,25 +198,64 @@ addTest(
 
 addTest(
   'Basttter aprovado',
-  { pVpAjustado: 0.95, alavancagem: 8 },
+  { pVpAjustado: 0.95, vacancia: 5, alavancagem: 8 },
   'verde, score 2/2',
   () => hasStatus(
-    calculateFiiMethods({ pVpAjustado: 0.95, alavancagem: 8 }).bastter,
+    calculateFiiMethods({ pVpAjustado: 0.95, vacancia: 5, alavancagem: 8 }).bastter,
     'green',
-    2,
-    2
+    3,
+    3
   )
 );
 
 addTest(
   'Basttter com P/VP acima do limite',
-  { pVpAjustado: 1.05, alavancagem: 8 },
+  { pVpAjustado: 1.05, vacancia: 5, alavancagem: 8 },
   'amarelo, score 1/2',
   () => hasStatus(
-    calculateFiiMethods({ pVpAjustado: 1.05, alavancagem: 8 }).bastter,
+    calculateFiiMethods({ pVpAjustado: 1.05, vacancia: 5, alavancagem: 8 }).bastter,
     'yellow',
+    2,
+    3
+  )
+);
+
+addTest(
+  'Bastter de Tijolo normaliza P/VP em escala percentual',
+  {},
+  'P/VP 94,20 e 95,00 com baixa vacância e alavancagem recebem aprovação',
+  () => {
+    const brco = calculateFiiMethods({
+      pVpAjustado: 94.2,
+      vacancia: 0,
+      alavancagem: 3.5
+    }).bastter;
+    const xpml = calculateFiiMethods({
+      pVpAjustado: 95,
+      vacancia: 5.2,
+      alavancagem: 10
+    }).bastter;
+
+    return hasStatus(brco, 'green', 3, 3)
+      && brco.pvp === '0.94'
+      && hasStatus(xpml, 'green', 3, 3)
+      && xpml.pvp === '0.95';
+  }
+);
+
+addTest(
+  'Bastter de Tijolo fica vermelho quando dois critérios falham',
+  {},
+  'P/VP sem desconto e alavancagem alta reprovam mesmo com baixa vacância',
+  () => hasStatus(
+    calculateFiiMethods({
+      pVpAjustado: 105,
+      vacancia: 4,
+      alavancagem: 25
+    }).bastter,
+    'rose',
     1,
-    2
+    3
   )
 );
 
@@ -262,35 +301,103 @@ addTest(
 addTest(
   'Caetano aprovado',
   { vacancia: 5, capRate: 8, concentracao: 'baixa', liquidezDiaria: 100000 },
-  'verde, score 4/4',
-  () => hasStatus(
-    calculateFiiMethods({
+  'vacância em 5% é verde',
+  () => {
+    const result = calculateFiiMethods({
       vacancia: 5,
       capRate: 8,
       concentracao: 'baixa',
       liquidezDiaria: 100000
-    }).caetano,
-    'green',
-    4,
-    4
-  )
+    }).caetano;
+    return result?.color === 'green' && result.approved;
+  }
+);
+
+addTest(
+  'Caetano considera vacância zero como eficiência máxima',
+  {},
+  '0% de vacância é verde independente dos demais indicadores',
+  () => calculateFiiMethods({
+    vacancia: 0,
+    capRate: null,
+    concentracao: null,
+    liquidezDiaria: null
+  }).caetano?.color === 'green'
+);
+
+addTest(
+  'Caetano classifica vacância média como atenção',
+  {},
+  'vacância acima de 5% e até 15% é amarela',
+  () => [5.01, 10, 15].every((vacancia) => (
+    calculateFiiMethods({ vacancia }).caetano?.color === 'yellow'
+  ))
+);
+
+addTest(
+  'Caetano classifica vacância acima de 15% como crítica',
+  {},
+  'vacância acima de 15% é vermelha',
+  () => calculateFiiMethods({ vacancia: 15.01 }).caetano?.color === 'rose'
+);
+
+addTest(
+  'Caetano sem vacância informada é insuficiente',
+  {},
+  'null sem dados de vacância',
+  () => calculateFiiMethods({
+    capRate: 8,
+    concentracao: 'baixa',
+    liquidezDiaria: 100000
+  }).caetano === null
+);
+
+addTest(
+  'Caetano com vacância baixa ignora indicadores operacionais não relacionados',
+  {},
+  'vacância abaixo do limite mantém verde mesmo sem Cap Rate, concentração ou liquidez',
+  () => calculateFiiMethods({
+    vacancia: 4.5,
+    capRate: null,
+    concentracao: null,
+    liquidezDiaria: null
+  }).caetano?.color === 'green'
+);
+
+addTest(
+  'Caetano com vacância média não vira crítica por outros indicadores',
+  {},
+  'vacância média mantém atenção mesmo com Cap Rate ou liquidez baixos',
+  () => calculateFiiMethods({
+    vacancia: 8,
+    capRate: 0,
+    concentracao: 'alta',
+    liquidezDiaria: 0
+  }).caetano?.color === 'yellow'
+);
+
+addTest(
+  'Caetano com vacância alta continua crítico com demais indicadores fortes',
+  {},
+  'vacância acima do limite é vermelha apesar dos demais indicadores',
+  () => calculateFiiMethods({
+    vacancia: 20,
+    capRate: 10,
+    concentracao: 'baixa',
+    liquidezDiaria: 100000
+  }).caetano?.color === 'rose'
 );
 
 addTest(
   'Caetano com vacancia acima do limite',
   { vacancia: 15, capRate: 8, concentracao: 'baixa', liquidezDiaria: 100000 },
-  'amarelo, score 3/4',
-  () => hasStatus(
-    calculateFiiMethods({
-      vacancia: 15,
-      capRate: 8,
-      concentracao: 'baixa',
-      liquidezDiaria: 100000
-    }).caetano,
-    'yellow',
-    3,
-    4
-  )
+  'vacância de 15% é amarela',
+  () => calculateFiiMethods({
+    vacancia: 15,
+    capRate: 8,
+    concentracao: 'baixa',
+    liquidezDiaria: 100000
+  }).caetano?.color === 'yellow'
 );
 
 addTest(
@@ -340,17 +447,16 @@ addTest(
 
 addTest(
   'Basttter com alavancagem ausente',
-  { pVpAjustado: 0.95 },
+  { pVpAjustado: 0.95, vacancia: 5 },
   'null, dados insuficientes',
-  () => calculateFiiMethods({ pVpAjustado: 0.95 }).bastter === null
+  () => calculateFiiMethods({ pVpAjustado: 0.95, vacancia: 5 }).bastter === null
 );
 
 addTest(
-  'Caetano com indicador ausente',
+  'Caetano sem vacância',
   { vacancia: 5, capRate: 8, concentracao: 'baixa' },
   'null, dados insuficientes',
   () => calculateFiiMethods({
-    vacancia: 5,
     capRate: 8,
     concentracao: 'baixa'
   }).caetano === null
@@ -416,42 +522,98 @@ addTest(
 );
 
 addTest(
-  'Baragiola de Papel calcula teto em reais com CDI ou IPCA e Spread',
+  'Baragiola de Papel calcula preço teto com Valor Patrimonial e Spread',
   {},
-  'DY anual dividido pela taxa-alvo produz teto comparável à cotação',
+  'RBRY11 a 82,17 com VP 99,63 e Spread 4,5% tem teto 104,11335 e fica verde',
   () => {
-    const cdiResult = calculateFiiMethods({
+    const rbry = calculateFiiMethods({
       fiiCategory: 'Papel',
-      price: 100,
-      dividendYieldRecorrente: 12,
+      price: 82.17,
+      pVp: 99.63,
       indexador: 'CDI',
-      spread: 'CDI + 2%'
-    }, { CDI: 10 }).baragiola;
+      spread: 'CDI + 4.5%'
+    }).baragiola;
     const ipcaResult = calculateFiiMethods({
       fiiCategory: 'Papel',
-      price: 130,
-      dividendYieldRecorrente: 8,
+      price: 100,
+      pVp: 99.63,
       indexador: 'IPCA',
       spread: 'IPCA + 6%'
-    }, { IPCA: 4 }).baragiola;
-    const missingReference = calculateFiiMethods({
+    }).baragiola;
+    const missingPvp = calculateFiiMethods({
       fiiCategory: 'Papel',
       price: 100,
-      dividendYieldRecorrente: 12,
+      pVp: null,
       indexador: 'CDI',
-      spread: 'CDI + 2%'
+      spread: 4.5
     }).baragiola;
 
-    return cdiResult !== null
-      && approximately(cdiResult.targetYield, 12)
-      && approximately(cdiResult.value, 100)
-      && cdiResult.color === 'green'
+    return rbry !== null
+      && approximately(rbry.value, 104.11335)
+      && rbry.spreadLabel === 'CDI + 4.5%'
+      && rbry.color === 'green'
+      && rbry.statusKey === 'fiiStatusAbaixoTeto'
       && ipcaResult !== null
-      && approximately(ipcaResult.targetYield, 10)
-      && approximately(ipcaResult.value, 104)
-      && ipcaResult.color === 'rose'
-      && missingReference === null;
+      && approximately(ipcaResult.value, 99.63 * 1.06)
+      && ipcaResult.color === 'green'
+      && missingPvp === null;
   }
+);
+
+addTest(
+  'Baragiola de Papel compara a cotação com o teto e trata Prefixado',
+  {},
+  'cotação abaixo do teto é verde, acima é vermelha e Prefixado usa spread como taxa',
+  () => {
+    const belowCeiling = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      price: 100,
+      pVp: 100,
+      indexador: 'CDI',
+      spread: 3
+    }).baragiola;
+    const aboveCeiling = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      price: 105,
+      pVp: 100,
+      indexador: 'IPCA',
+      spread: 3
+    }).baragiola;
+    const prefixed = calculateFiiMethods({
+      fiiCategory: 'Papel',
+      price: 100,
+      pVp: 100,
+      indexador: 'Prefixado',
+      spread: 3
+    }).baragiola;
+
+    return belowCeiling?.color === 'green'
+      && belowCeiling.statusKey === 'fiiStatusAbaixoTeto'
+      && aboveCeiling?.color === 'rose'
+      && aboveCeiling.statusKey === 'fiiStatusAcimaTeto'
+      && prefixed?.spreadLabel === 'PREFIXADO: 3%'
+      && approximately(prefixed.value, 103)
+      && prefixed.color === 'green'
+      && prefixed.statusKey === 'fiiStatusAbaixoTeto';
+  }
+);
+
+addTest(
+  'Baragiola de Papel sem P/VP ou Spread é insuficiente',
+  {},
+  'não calcula o preço teto quando faltam os dados necessários',
+  () => calculateFiiMethods({
+    fiiCategory: 'Papel',
+    price: 100,
+    indexador: 'CDI',
+    spread: 4.5
+  }).baragiola === null
+    && calculateFiiMethods({
+      fiiCategory: 'Papel',
+      price: 100,
+      pVp: 99.63,
+      indexador: 'CDI'
+    }).baragiola === null
 );
 
 addTest(
@@ -659,6 +821,7 @@ addTest(
       metaPercent: 25,
       vacancia: 5.5,
       pVpAjustado: 0.92,
+      pVp: 0.95,
       capRate: 8.1,
       price: 30
     });
@@ -689,12 +852,14 @@ addTest(
     return apiPayload.meta === 25
       && apiPayload.details.vacancia === 5.5
       && apiPayload.details.pVpAjustado === 0.92
+      && apiPayload.details.pVp === 0.95
       && apiPayload.details.capRate === 8.1
       && apiPayload.price === 30
       && hydratedAsset.meta === 25
       && hydratedAsset.metaPercent === 25
       && hydratedAsset.vacancia === 5.5
       && hydratedAsset.pVpAjustado === 0.92
+      && hydratedAsset.pVp === 0.95
       && hydratedAsset.capRate === 8.1
       && asset.qty === 3
       && asset.pm === 20

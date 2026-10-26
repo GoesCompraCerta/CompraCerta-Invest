@@ -278,6 +278,7 @@ export const getFiiIndicators = (asset) => {
     ltv: readFiiNumber(asset?.ltv),
     indexador: asset?.indexador || null,
     spread: asset?.spread || null,
+    priceToBook: readFiiNumber(asset?.pVp),
     currentPrice: readFiiNumber(asset?.price),
     recurringYield: readFiiNumber(asset?.dividendYieldRecorrente, asset?.dividendYield),
     adjustedPvp: readFiiNumber(asset?.pVpAjustado, asset?.pVp),
@@ -325,11 +326,11 @@ export const calculatePaperReferenceRates = (cdiItems, ipcaItems) => {
 };
 
 const readSpreadPercent = (value) => {
-  const match = String(value ?? '').match(/-?\d+(?:[.,]\d+)?/);
-  return match ? readFiiNumber(match[0]) : null;
+  const matches = String(value ?? '').match(/-?\d+(?:[.,]\d+)?/g);
+  return matches?.length ? readFiiNumber(matches[matches.length - 1]) : null;
 };
 
-const calculatePaperFiiMethods = (indicators, referenceRates) => {
+const calculatePaperFiiMethods = (indicators, patrimonialValue) => {
   const rating = String(indicators.rating || '').trim().toUpperCase();
   const ratingScore = rating === 'HIGH GRADE' || /^(AAA|AA|A|BBB)[+-]?$/.test(rating)
     ? 10
@@ -351,30 +352,26 @@ const calculatePaperFiiMethods = (indicators, referenceRates) => {
 
   const indexador = String(indicators.indexador || '').trim().toUpperCase();
   const spread = readSpreadPercent(indicators.spread);
-  const referenceRate = indexador === 'PREFIXADO'
-    ? 0
-    : referenceRates?.[indexador];
-  const targetYield = spread === null
-    || (indexador !== 'PREFIXADO' && !Number.isFinite(referenceRate))
-    ? null
-    : referenceRate + spread;
-  const recurringYield = indicators.recurringYield;
-  const normalizedYield = recurringYield === null
-    ? null
-    : recurringYield > 1 ? recurringYield / 100 : recurringYield;
-  const annualDividend = indicators.currentPrice !== null && normalizedYield !== null
-    ? indicators.currentPrice * normalizedYield
+  const ceiling = patrimonialValue !== null
+    && patrimonialValue > 0
+    && spread !== null
+    ? patrimonialValue * (1 + spread / 100)
     : null;
-  const ceiling = annualDividend !== null && targetYield > 0
-    ? annualDividend / (targetYield / 100)
-    : null;
-  const baragiola = ceiling === null || indicators.currentPrice === null
+  const spreadLabel = spread === null
+    ? null
+    : indexador === 'PREFIXADO'
+      ? `${indexador}: ${spread}%`
+      : `${indexador} + ${spread}%`;
+  const baragiola = spread === null || ceiling === null
     ? null
     : {
         value: ceiling,
-        targetYield,
+        spread,
+        spreadLabel,
         color: indicators.currentPrice <= ceiling ? 'green' : 'rose',
-        statusKey: indicators.currentPrice <= ceiling ? 'fiiStatusAbaixoTeto' : 'fiiStatusAcimaTeto',
+        statusKey: indicators.currentPrice <= ceiling
+          ? 'fiiStatusAbaixoTeto'
+          : 'fiiStatusAcimaTeto',
         approved: indicators.currentPrice <= ceiling
       };
 
@@ -396,7 +393,7 @@ const calculatePaperFiiMethods = (indicators, referenceRates) => {
 export const calculateFiiMethods = (asset, referenceRates = {}) => {
   const indicators = getFiiIndicators(asset);
   if (indicators.fiiCategory === 'Papel') {
-    return calculatePaperFiiMethods(indicators, referenceRates);
+    return calculatePaperFiiMethods(indicators, readFiiNumber(asset?.pVp));
   }
 
   const {
@@ -426,10 +423,13 @@ export const calculateFiiMethods = (asset, referenceRates = {}) => {
   // Antes: um único boolean `approved = adjustedPvp <= 1 && leverage < 10`.
   // Agora: cada condição vira um critério independente, então dá pra saber
   // se falhou 1 (Amarelo) ou os 2 (Vermelho).
-  const bastter = adjustedPvp !== null && leverage !== null
+  const normalizedPvp = adjustedPvp === null
+    ? null
+    : adjustedPvp > 10 ? adjustedPvp / 100 : adjustedPvp;
+  const bastter = normalizedPvp !== null && vacancy !== null && leverage !== null
     ? (() => {
         const evaluation = evaluateCriteria(
-          [adjustedPvp <= 1, leverage < 10],
+          [normalizedPvp < 1, vacancy < 10, leverage < 20],
           {
             approvedStatus: 'Aprovado',
             attentionStatus: 'Atenção',
@@ -437,7 +437,7 @@ export const calculateFiiMethods = (asset, referenceRates = {}) => {
           }
         );
         return {
-          pvp: adjustedPvp.toFixed(2),
+          pvp: normalizedPvp.toFixed(2),
           leverage: leverage.toFixed(2),
           ...evaluation,
           approved: evaluation.score === evaluation.total // compat com código legado
@@ -469,22 +469,12 @@ export const calculateFiiMethods = (asset, referenceRates = {}) => {
   })();
 
   // ── CAETANO — Eficiência Operacional (4 critérios) ──
-  const caetano = vacancy !== null && capRate !== null && concentrationRate !== null && dailyLiquidity !== null
-    ? (() => {
-        const evaluation = evaluateCriteria(
-          [vacancy < 10, capRate >= 7, concentrationRate < 25, dailyLiquidity > 50000],
-          {
-            approvedStatus: 'Saudável',
-            attentionStatus: 'Atenção Operacional',
-            rejectedStatus: 'Reprovado'
-          }
-        );
-        return {
-          ...evaluation,
-          approved: evaluation.score === evaluation.total // compat com código legado
-        };
-      })()
-    : null;
+  const caetano = vacancy === null
+    ? null
+    : {
+        color: vacancy <= 5 ? 'green' : vacancy <= 15 ? 'yellow' : 'rose',
+        approved: vacancy <= 5
+      };
 
   return { bastter, baragiola, caetano };
 };

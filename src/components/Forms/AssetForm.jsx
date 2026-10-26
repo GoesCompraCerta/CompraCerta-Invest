@@ -57,7 +57,8 @@ const PAPER_FIELDS = [
   ['rating', 'Rating', '', 'select'],
   ['ltv', 'LTV (%)', ''],
   ['indexador', 'Indexador', '', 'select'],
-  ['spread', 'Spread', '', 'text']
+  ['spread', 'Spread', '', 'text'],
+  ['pVp', 'Valor Patrimonial (R$)', '', 'number']
 ];
 
 const getRatingOptionValue = (value) => {

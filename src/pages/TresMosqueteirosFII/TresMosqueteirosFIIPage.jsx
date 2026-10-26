@@ -265,7 +265,7 @@ export default function ThreeMusketeersPage({
                             title={t.fiiBaragiolaTitle}
                             subtitle={baragiola
                               ? paperFii
-                                ? `${t.fiiCeiling}: ${formatMoney(baragiola.value)} | ${t.fiiTargetYield}: ${displayNumber(baragiola.targetYield, '%')}`
+                                ? `${baragiola.value === null ? '' : `${t.fiiCeiling}: ${formatMoney(baragiola.value)} | `}${baragiola.spreadLabel}`
                                 : `${t.fiiCeiling}: ${formatMoney(baragiola.value)} | DY: ${displayNumber(recurringYield, '%')} | ${t.fiiCapRate}: ${displayNumber(capRate, '%')}`
                               : null}
                             color={baragiola ? baragiola.color : null}
