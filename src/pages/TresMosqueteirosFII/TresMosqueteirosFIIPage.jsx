@@ -206,6 +206,10 @@ export default function ThreeMusketeersPage({
                                 <span className="text-slate-400 block">{t.fiiSpread}</span>
                                 <strong>{spread || '—'}</strong>
                               </div>
+                              <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-1.5 py-1">
+                                <span className="text-slate-400 block">{t.vpa}</span>
+                                <strong>{asset.pVp === null || asset.pVp === undefined || asset.pVp === '' ? '—' : formatMoney(asset.pVp)}</strong>
+                              </div>
                             </>
                           ) : (
                             <>
@@ -250,8 +254,8 @@ export default function ThreeMusketeersPage({
                             title={t.fiiBastterTitle}
                             subtitle={bastter
                               ? paperFii
-                                ? `${t.fiiRating}: ${rating || '—'} | ${t.fiiLtv}: ${displayNumber(ltv, '%')} | ${bastter.score}/10`
-                                : `${t.fiiMethodSubtitlePvp}: ${bastter.pvp} | ${t.fiiLeverage}: ${displayNumber(leverage, '%')}`
+                                ? <><div>{t.fiiRating}: {rating || '—'}</div><div>{t.fiiLtv}: {displayNumber(ltv, '%')}</div><div>Nota: {bastter.score}/10</div></>
+                                : <><div>{t.fiiMethodSubtitlePvp}: {bastter.pvp}</div><div>{t.fiiLeverage}: {displayNumber(leverage, '%')}</div><div>Nota: {bastter.score}/{bastter.total}</div></>
                               : null}
                             color={bastter ? bastter.color : null}
                             statusText={paperFii && bastter ? t[bastter.statusKey] : undefined}
@@ -265,8 +269,8 @@ export default function ThreeMusketeersPage({
                             title={t.fiiBaragiolaTitle}
                             subtitle={baragiola
                               ? paperFii
-                                ? `${baragiola.value === null ? '' : `${t.fiiCeiling}: ${formatMoney(baragiola.value)} | `}${baragiola.spreadLabel}`
-                                : `${t.fiiCeiling}: ${formatMoney(baragiola.value)} | DY: ${displayNumber(recurringYield, '%')} | ${t.fiiCapRate}: ${displayNumber(capRate, '%')}`
+                                ? <>{baragiola.value === null ? null : <div>{t.fiiCeiling}: {formatMoney(baragiola.value)}</div>}<div>{baragiola.spreadLabel}</div></>
+                                : <><div>{t.fiiCeiling}: {formatMoney(baragiola.value)}</div><div>DY: {displayNumber(recurringYield, '%')}</div><div>{t.fiiCapRate}: {displayNumber(capRate, '%')}</div></>
                               : null}
                             color={baragiola ? baragiola.color : null}
                             statusText={paperFii && baragiola ? t[baragiola.statusKey] : undefined}
@@ -285,8 +289,8 @@ export default function ThreeMusketeersPage({
                               title={t.fiiCaetanoTitle}
                               subtitle={caetano
                                 ? paperFii
-                                  ? `${t.fiiDailyLiquidity}: ${displayCurrencyShort(dailyLiquidity)} | ${t.fiiPatrimony}: ${displayCurrencyShort(realPatrimony)}`
-                                  : `${t.fiiVacancy}: ${displayNumber(vacancy, '%')} | ${t.fiiCapRate}: ${displayNumber(capRate, '%')} | ${t.fiiConcentration}: ${displayConcentration(concentration)} | ${t.fiiDailyLiquidity}: ${displayCurrencyShort(dailyLiquidity)}`
+                                  ? <><div>{t.fiiDailyLiquidity}: {displayCurrencyShort(dailyLiquidity)}</div><div>{t.fiiPatrimony}: {displayCurrencyShort(realPatrimony)}</div></>
+                                  : <><div>{t.fiiVacancy}: {displayNumber(vacancy, '%')}</div><div>{t.fiiCapRate}: {displayNumber(capRate, '%')}</div><div>{t.fiiConcentration}: {displayConcentration(concentration)}</div><div>{t.fiiDailyLiquidity}: {displayCurrencyShort(dailyLiquidity)}</div></>
                                 : null}
                               color={caetano ? caetano.color : null}
                               statusText={paperFii && caetano ? t[caetano.statusKey] : undefined}

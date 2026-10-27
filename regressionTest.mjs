@@ -28,6 +28,7 @@ import {
   updateProvento as updateProventoRequest
 } from './src/services/proventosService.js';
 import { updatePositionView } from './src/services/authService.js';
+import { parseNumberWithMultiplier } from './src/utils/formatNumbers.js';
 
 const tests = [];
 
@@ -45,6 +46,14 @@ const hasStatus = (result, color, score, total) => (
   && result.color === color
   && result.score === score
   && result.total === total
+);
+
+addTest(
+  'Valores com sufixos multiplicadores são convertidos',
+  {},
+  '1.5m e 2b são convertidos para valores absolutos',
+  () => parseNumberWithMultiplier('1.5m') === 1_500_000
+    && parseNumberWithMultiplier('2b') === 2_000_000_000
 );
 
 addTest(
@@ -198,10 +207,10 @@ addTest(
 
 addTest(
   'Basttter aprovado',
-  { pVpAjustado: 0.95, vacancia: 5, alavancagem: 8 },
-  'verde, score 2/2',
+  { pVpAjustado: 0.85, vacancia: 5, alavancagem: 8 },
+  'verde, score 3/3',
   () => hasStatus(
-    calculateFiiMethods({ pVpAjustado: 0.95, vacancia: 5, alavancagem: 8 }).bastter,
+    calculateFiiMethods({ pVpAjustado: 0.85, vacancia: 5, alavancagem: 8 }).bastter,
     'green',
     3,
     3
@@ -223,7 +232,7 @@ addTest(
 addTest(
   'Bastter de Tijolo normaliza P/VP em escala percentual',
   {},
-  'P/VP 94,20 e 95,00 com baixa vacância e alavancagem recebem aprovação',
+  'P/VP 94,20 e 95,00 ficam amarelos por não terem desconto abaixo de 0,90',
   () => {
     const brco = calculateFiiMethods({
       pVpAjustado: 94.2,
@@ -236,10 +245,31 @@ addTest(
       alavancagem: 10
     }).bastter;
 
-    return hasStatus(brco, 'green', 3, 3)
+    return hasStatus(brco, 'yellow', 2, 3)
       && brco.pvp === '0.94'
-      && hasStatus(xpml, 'green', 3, 3)
+      && hasStatus(xpml, 'yellow', 2, 3)
       && xpml.pvp === '0.95';
+  }
+);
+
+addTest(
+  'Bastter de Tijolo exige P/VP abaixo de 0,90',
+  {},
+  'P/VP 0,89 passa e 0,90 não passa no critério de desconto',
+  () => {
+    const belowLimit = calculateFiiMethods({
+      pVpAjustado: 0.89,
+      vacancia: 5,
+      alavancagem: 8
+    }).bastter;
+    const atLimit = calculateFiiMethods({
+      pVpAjustado: 0.9,
+      vacancia: 5,
+      alavancagem: 8
+    }).bastter;
+
+    return hasStatus(belowLimit, 'green', 3, 3)
+      && hasStatus(atLimit, 'yellow', 2, 3);
   }
 );
 
@@ -300,11 +330,11 @@ addTest(
 
 addTest(
   'Caetano aprovado',
-  { vacancia: 5, capRate: 8, concentracao: 'baixa', liquidezDiaria: 100000 },
-  'vacância em 5% é verde',
+  { vacancia: 10, capRate: 8, concentracao: 'baixa', liquidezDiaria: 100000 },
+  'vacância em 10% é verde',
   () => {
     const result = calculateFiiMethods({
-      vacancia: 5,
+      vacancia: 10,
       capRate: 8,
       concentracao: 'baixa',
       liquidezDiaria: 100000
@@ -328,17 +358,17 @@ addTest(
 addTest(
   'Caetano classifica vacância média como atenção',
   {},
-  'vacância acima de 5% e até 15% é amarela',
-  () => [5.01, 10, 15].every((vacancia) => (
+  'vacância acima de 10% e até 20% é amarela',
+  () => [10.01, 15, 20].every((vacancia) => (
     calculateFiiMethods({ vacancia }).caetano?.color === 'yellow'
   ))
 );
 
 addTest(
-  'Caetano classifica vacância acima de 15% como crítica',
+  'Caetano classifica vacância acima de 20% como crítica',
   {},
-  'vacância acima de 15% é vermelha',
-  () => calculateFiiMethods({ vacancia: 15.01 }).caetano?.color === 'rose'
+  'vacância acima de 20% é vermelha',
+  () => calculateFiiMethods({ vacancia: 20.01 }).caetano?.color === 'rose'
 );
 
 addTest(
@@ -369,7 +399,7 @@ addTest(
   {},
   'vacância média mantém atenção mesmo com Cap Rate ou liquidez baixos',
   () => calculateFiiMethods({
-    vacancia: 8,
+    vacancia: 12,
     capRate: 0,
     concentracao: 'alta',
     liquidezDiaria: 0
@@ -379,9 +409,9 @@ addTest(
 addTest(
   'Caetano com vacância alta continua crítico com demais indicadores fortes',
   {},
-  'vacância acima do limite é vermelha apesar dos demais indicadores',
+  'vacância acima de 20% é vermelha apesar dos demais indicadores',
   () => calculateFiiMethods({
-    vacancia: 20,
+    vacancia: 20.01,
     capRate: 10,
     concentracao: 'baixa',
     liquidezDiaria: 100000

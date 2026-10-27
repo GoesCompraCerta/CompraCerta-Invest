@@ -54,7 +54,7 @@ export default function MethodCard({
         {title}
       </div>
 
-      {subtitle && <div className="min-w-0 break-words leading-tight mb-2 text-slate-300 flex-1">{subtitle}</div>}
+      {subtitle && <div className="min-w-0 break-words leading-tight mb-2 text-slate-300 flex flex-col gap-1 flex-1">{subtitle}</div>}
 
       <div className={`pt-1.5 border-t border-slate-700/60 font-semibold ${
         insufficient ? 'text-slate-400' : ''

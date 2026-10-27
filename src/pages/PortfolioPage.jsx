@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import AssetForm from '../components/Forms/AssetForm';
 import AssetsTable from '../components/Portfolio/AssetsTable';
 import { isCrypto } from '../utils/cryptoUtils';
+import { parseNumberWithMultiplier } from '../utils/formatNumbers';
 import { fetchExchangeRates } from '../services/assetService';
 import { normalizeAssetType } from '../constants/config';
 
@@ -99,19 +100,7 @@ export default function PortfolioPage({
 
   const handleSaveAsset = async (e) => {
     e.preventDefault();
-    const parseNumericInput = (value) => {
-      if (value === undefined || value === null || String(value).trim() === '') return null;
-      const normalized = String(value).trim().replace(/\s/g, '').replace(/%$/, '');
-      const brazilianNumber = normalized.includes(',')
-        ? normalized.replace(/\./g, '').replace(',', '.')
-        : /^0\.\d+$/.test(normalized)
-          ? normalized
-          : /^\d{1,3}(\.\d{3})+$/.test(normalized)
-          ? normalized.replace(/\./g, '')
-          : normalized;
-      const number = Number(brazilianNumber);
-      return Number.isFinite(number) ? number : null;
-    };
+    const parseNumericInput = parseNumberWithMultiplier;
     const parseOptionalNumber = (value) => parseNumericInput(value);
     const quantity = parseNumericInput(formData.qty);
     const enteredPrice = parseNumericInput(formData.price);

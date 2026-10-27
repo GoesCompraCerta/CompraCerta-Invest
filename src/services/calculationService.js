@@ -429,7 +429,7 @@ export const calculateFiiMethods = (asset, referenceRates = {}) => {
   const bastter = normalizedPvp !== null && vacancy !== null && leverage !== null
     ? (() => {
         const evaluation = evaluateCriteria(
-          [normalizedPvp < 1, vacancy < 10, leverage < 20],
+          [normalizedPvp < 0.9, vacancy < 10, leverage < 20],
           {
             approvedStatus: 'Aprovado',
             attentionStatus: 'Atenção',
@@ -472,8 +472,8 @@ export const calculateFiiMethods = (asset, referenceRates = {}) => {
   const caetano = vacancy === null
     ? null
     : {
-        color: vacancy <= 5 ? 'green' : vacancy <= 15 ? 'yellow' : 'rose',
-        approved: vacancy <= 5
+        color: vacancy <= 10 ? 'green' : vacancy <= 20 ? 'yellow' : 'rose',
+        approved: vacancy <= 10
       };
 
   return { bastter, baragiola, caetano };

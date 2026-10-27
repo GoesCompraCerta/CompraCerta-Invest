@@ -58,7 +58,7 @@ const PAPER_FIELDS = [
   ['ltv', 'LTV (%)', ''],
   ['indexador', 'Indexador', '', 'select'],
   ['spread', 'Spread', '', 'text'],
-  ['pVp', 'Valor Patrimonial (R$)', '', 'number']
+  ['pVp', 'Valor Patrimonial (R$)', '', 'text']
 ];
 
 const getRatingOptionValue = (value) => {
@@ -165,6 +165,7 @@ export default function AssetForm({ onSubmit, editingId, onCancel, formData, onF
       </label>
       <input
         type={inputType}
+        placeholder={inputType === 'text' && ['liquidezDiaria', 'patrimonioReal', 'pVp'].includes(field) ? 'Ex: 1.5k, 2m, 1b' : undefined}
         step={inputType === 'number' && ['qty', 'pm', 'price'].includes(field) ? 'any' : undefined}
         autoComplete={field === 'ticker' ? 'off' : undefined}
         spellCheck={field === 'ticker' ? false : undefined}

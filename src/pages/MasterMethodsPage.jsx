@@ -128,7 +128,9 @@ export default function MasterMethodsPage({
                         <div className="w-full grid grid-cols-2 gap-3 mt-auto">
                           <MethodCard
                             title={`BAZIN — ${t.precoTeto}`}
-                            subtitle={bazin ? `DPA: ${formatMoney(bazin.dpa)} | Teto: ${formatMoney(bazin.value)}` : null}
+                            subtitle={bazin
+                              ? <><div>DPA: {formatMoney(bazin.dpa)}</div><div>Teto: {formatMoney(bazin.value)}</div></>
+                              : null}
                             color={bazin ? bazin.color : null}
                             approved={bazin ? bazin.approved : null}
                             approvedText={t.bazinComprarMeta}
@@ -139,7 +141,7 @@ export default function MasterMethodsPage({
                           />
                           <MethodCard
                             title={`LYNCH — ${t.precoJusto}`}
-                            subtitle={lynch ? `Justo: ${formatMoney(lynch.value)}` : null}
+                            subtitle={lynch ? <div>Justo: {formatMoney(lynch.value)}</div> : null}
                             color={lynch ? lynch.color : null}
                             approved={lynch ? lynch.approved : null}
                             approvedText={t.lynchAbaixoJusto}
@@ -150,7 +152,7 @@ export default function MasterMethodsPage({
                           />
                           <MethodCard
                             title={`GRAHAM — ${t.valorIntrinseco}`}
-                            subtitle={graham ? `Intrínseco: ${formatMoney(graham.value)}` : null}
+                            subtitle={graham ? <div>Intrínseco: {formatMoney(graham.value)}</div> : null}
                             color={graham ? graham.color : null}
                             approved={graham ? graham.approved : null}
                             approvedText={t.grahamComMargem}
@@ -161,7 +163,13 @@ export default function MasterMethodsPage({
                           />
                           <MethodCard
                             title={`BUFFETT — ${t.fossoEconomico}`}
-                            subtitle={buffett ? `${t.roic}: ${buffett.roic ? `${buffett.roic.toFixed(2)}%` : '—'} | ${t.divEbitda}: ${buffett.debt ? buffett.debt.value.toFixed(2) : '—'}` : null}
+                            subtitle={buffett
+                              ? <>
+                                  <div>{t.roic}: {buffett.roic ? `${buffett.roic.toFixed(2)}%` : '—'}</div>
+                                  <div>{t.divEbitda}: {buffett.debt ? buffett.debt.value.toFixed(2) : '—'}</div>
+                                  <div>Avaliação: {buffett.score}/{buffett.total}</div>
+                                </>
+                              : null}
                             color={buffett ? buffett.color : null}
                             approved={buffett ? buffett.approved : null}
                             approvedText={t.excelenciaFinanceira}
