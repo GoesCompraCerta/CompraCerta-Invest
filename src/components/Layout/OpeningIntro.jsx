@@ -6,8 +6,9 @@ export default function OpeningIntro({ onFinish, t }) {
   const transitionStartedRef = useRef(false);
   const pauseTimeoutRef = useRef(null);
   const closeTimeoutRef = useRef(null);
+  const introTimeoutRef = useRef(null);
   const [isClosing, setIsClosing] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
 
   const startFadeOut = () => {
     setIsClosing(true);
@@ -18,6 +19,7 @@ export default function OpeningIntro({ onFinish, t }) {
     if (transitionStartedRef.current) return;
 
     transitionStartedRef.current = true;
+    window.clearTimeout(introTimeoutRef.current);
     videoRef.current?.pause();
     pauseTimeoutRef.current = window.setTimeout(startFadeOut, 500);
   };
@@ -26,27 +28,26 @@ export default function OpeningIntro({ onFinish, t }) {
     if (transitionStartedRef.current) return;
 
     transitionStartedRef.current = true;
+    window.clearTimeout(introTimeoutRef.current);
     videoRef.current?.pause();
     startFadeOut();
   };
 
-  useEffect(() => {
+  const handleCanPlay = () => {
     const video = videoRef.current;
 
-    if (!video) return;
+    if (!video || introTimeoutRef.current !== null || transitionStartedRef.current) return;
 
-    video.muted = false;
-    const introTimeout = window.setTimeout(handleVideoEnd, 5000);
-
-    video.play().catch(() => {
-      // Browsers may block autoplay with audio until the user interacts.
-      video.muted = true;
-      setIsMuted(true);
-      video.play().catch(() => {});
+    video.playbackRate = 1.2;
+    video.play().catch((error) => {
+      console.error('Não foi possível iniciar o vídeo de abertura:', error);
     });
+    introTimeoutRef.current = window.setTimeout(handleVideoEnd, 4500);
+  };
 
+  useEffect(() => {
     return () => {
-      window.clearTimeout(introTimeout);
+      window.clearTimeout(introTimeoutRef.current);
       window.clearTimeout(pauseTimeoutRef.current);
       window.clearTimeout(closeTimeoutRef.current);
     };
@@ -67,10 +68,10 @@ export default function OpeningIntro({ onFinish, t }) {
         ref={videoRef}
         className="h-full w-full object-cover"
         src={introVideo}
-        autoPlay
         muted={isMuted}
         playsInline
         preload="auto"
+        onCanPlay={handleCanPlay}
         onEnded={handleVideoEnd}
         aria-label={t.openingVideoLabel}
       />
