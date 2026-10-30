@@ -1,7 +1,9 @@
 import { BRAPI_TYPES } from '../constants/config';
+import { ensureApiKeysLoaded } from './authService';
 import { brapiApiKeyStorage } from './storageService';
 
 const fetchBrapiQuote = async (ticker) => {
+  await ensureApiKeysLoaded();
   const symbol = String(ticker || '').trim().toUpperCase();
   if (!symbol) throw new Error('Ticker brapi inválido.');
 

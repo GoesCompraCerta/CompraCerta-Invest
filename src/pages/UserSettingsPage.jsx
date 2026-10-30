@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, Download, ExternalLink, Eye, EyeOff, Moon, Sun, Trash2 } from 'lucide-react';
-import { activateProForTest } from '../services/authService';
+import { activateProForTest, getMe, updateApiKeys } from '../services/authService';
 import { deleteAccount } from '../services/lgpdService';
 import { exportPortfolioToExcel } from '../services/calculationService';
-import { brapiApiKeyStorage, coinGeckoApiKeyStorage } from '../services/storageService';
+import {
+  clearLegacyApiKeys,
+  getLegacyApiKeys,
+  setServerApiKeys
+} from '../services/storageService';
 import DeleteAccountModal from '../components/Common/DeleteAccountModal';
 
 const PLAN_LINKS = {
@@ -29,6 +33,8 @@ export default function UserSettingsPage({
 }) {
   const [activeTab, setActiveTab] = useState('account');
   const [apiKeySaved, setApiKeySaved] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState('');
+  const [isLoadingApiKeys, setIsLoadingApiKeys] = useState(true);
   const [testActivationMessage, setTestActivationMessage] = useState('');
   const [isActivatingTestPlan, setIsActivatingTestPlan] = useState(false);
   const [showBrapiApiKey, setShowBrapiApiKey] = useState(false);
@@ -38,16 +44,72 @@ export default function UserSettingsPage({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState('');
-  const [brapiApiKey, setBrapiApiKey] = useState(() => brapiApiKeyStorage.get());
-  const [coinGeckoApiKey, setCoinGeckoApiKey] = useState(() => coinGeckoApiKeyStorage.get());
+  const [brapiApiKey, setBrapiApiKey] = useState(() => getLegacyApiKeys().brapi_api_key);
+  const [coinGeckoApiKey, setCoinGeckoApiKey] = useState(() => getLegacyApiKeys().coingecko_api_key);
 
-  const handleSaveApiKey = (event) => {
+  useEffect(() => {
+    let isMounted = true;
+    const loadApiKeys = async () => {
+      setIsLoadingApiKeys(true);
+      setApiKeyError('');
+      try {
+        const profile = await getMe();
+        const user = profile.user || {};
+        setServerApiKeys(user);
+        const legacyKeys = getLegacyApiKeys();
+        const migration = {};
+
+        if (!user.brapi_api_key && legacyKeys.brapi_api_key) {
+          migration.brapi_api_key = legacyKeys.brapi_api_key;
+        }
+        if (!user.coingecko_api_key && legacyKeys.coingecko_api_key) {
+          migration.coingecko_api_key = legacyKeys.coingecko_api_key;
+        }
+
+        if (isMounted) {
+          setBrapiApiKey(user.brapi_api_key || legacyKeys.brapi_api_key);
+          setCoinGeckoApiKey(user.coingecko_api_key || legacyKeys.coingecko_api_key);
+        }
+
+        if (Object.keys(migration).length > 0) {
+          const migratedProfile = await updateApiKeys(migration);
+          const migratedUser = migratedProfile.user || {};
+          clearLegacyApiKeys(Object.keys(migration));
+          if (isMounted) {
+            setBrapiApiKey(migratedUser.brapi_api_key || '');
+            setCoinGeckoApiKey(migratedUser.coingecko_api_key || '');
+          }
+        } else {
+          clearLegacyApiKeys();
+        }
+      } catch (error) {
+        if (isMounted) setApiKeyError(error.message);
+      } finally {
+        if (isMounted) setIsLoadingApiKeys(false);
+      }
+    };
+
+    loadApiKeys();
+    return () => { isMounted = false; };
+  }, []);
+
+  const handleSaveApiKey = async (event) => {
     event.preventDefault();
-    brapiApiKeyStorage.set(brapiApiKey);
-    coinGeckoApiKeyStorage.set(coinGeckoApiKey);
-    setBrapiApiKey(brapiApiKeyStorage.get());
-    setCoinGeckoApiKey(coinGeckoApiKeyStorage.get());
-    setApiKeySaved(true);
+    setApiKeyError('');
+    setApiKeySaved(false);
+    try {
+      const profile = await updateApiKeys({
+        brapi_api_key: brapiApiKey.trim(),
+        coingecko_api_key: coinGeckoApiKey.trim()
+      });
+      const user = profile.user || {};
+      clearLegacyApiKeys();
+      setBrapiApiKey(user.brapi_api_key || '');
+      setCoinGeckoApiKey(user.coingecko_api_key || '');
+      setApiKeySaved(true);
+    } catch (error) {
+      setApiKeyError(error.message);
+    }
   };
 
   const handleActivateProTest = async () => {
@@ -245,9 +307,11 @@ export default function UserSettingsPage({
                   <input
                     type={isVisible ? 'text' : 'password'}
                     value={value}
+                    disabled={isLoadingApiKeys}
                     onChange={(event) => {
                       setValue(event.target.value);
                       setApiKeySaved(false);
+                      setApiKeyError('');
                     }}
                     className={`${inputClass} pr-10`}
                     autoComplete="off"
@@ -267,7 +331,8 @@ export default function UserSettingsPage({
               ))}
               <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
                 {apiKeySaved && <span className={`mr-auto flex items-center gap-1.5 text-sm font-bold ${themeStyle.text}`}><Check className="h-4 w-4" />{t.apiKeysSaved}</span>}
-                <button type="submit" className={`rounded-xl px-4 py-2.5 text-sm ${themeStyle.btn}`}>{t.saveBtn}</button>
+                {apiKeyError && <span role="alert" className="mr-auto text-sm text-red-500">{apiKeyError}</span>}
+                <button type="submit" disabled={isLoadingApiKeys} className={`rounded-xl px-4 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${themeStyle.btn}`}>{t.saveBtn}</button>
               </div>
             </div>
           </form>

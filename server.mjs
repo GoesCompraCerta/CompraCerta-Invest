@@ -29,7 +29,7 @@ import {
   updateAssetPricesByUserId,
   updateProventoById,
   updateUserPlan,
-  updateUserPositionView,
+  updateUserPreferences,
   setMarketCache
 } from './server/db.js';
 import { assertJwtSecret, generateToken, hashPassword, requireAuth, verifyPassword } from './server/auth.js';
@@ -157,7 +157,9 @@ const toPublicUser = (user) => ({
   email: user.email,
   plan: user.plan,
   plan_expires_at: user.plan_expires_at,
-  position_view: user.position_view || 'overview'
+  position_view: user.position_view || 'overview',
+  brapi_api_key: user.brapi_api_key || '',
+  coingecko_api_key: user.coingecko_api_key || ''
 });
 
 const handleAuthRegister = async (request, response) => {
@@ -334,13 +336,31 @@ const handleUpdateAuthPreferences = async (request, response) => {
     return;
   }
 
-  const positionView = payload?.position_view;
-  if (!['overview', 'class'].includes(positionView)) {
+  const preferences = {};
+  if (Object.hasOwn(payload || {}, 'position_view')) {
+    if (!['overview', 'class'].includes(payload.position_view)) {
+      sendJson(response, 400, { error: 'A visão de posicionamento informada é inválida.' });
+      return;
+    }
+    preferences.position_view = payload.position_view;
+  }
+
+  for (const field of ['brapi_api_key', 'coingecko_api_key']) {
+    if (!Object.hasOwn(payload || {}, field)) continue;
+    const apiKey = payload[field];
+    if (typeof apiKey !== 'string' || apiKey.length > 255) {
+      sendJson(response, 400, { error: 'A chave de API informada é inválida.' });
+      return;
+    }
+    preferences[field] = apiKey.trim() || null;
+  }
+
+  if (Object.keys(preferences).length === 0) {
     sendJson(response, 400, { error: 'A visão de posicionamento informada é inválida.' });
     return;
   }
 
-  const user = await updateUserPositionView(userId, positionView);
+  const user = await updateUserPreferences(userId, preferences);
   if (!user) {
     sendJson(response, 404, { error: 'Usuário não encontrado.' });
     return;

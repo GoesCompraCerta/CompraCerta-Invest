@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from '../constants/config';
+import { STORAGE_KEYS } from '../constants/config.js';
 
 // ── Assets Storage Service ────────────────────────────────────────────────────
 export const assetsStorage = {
@@ -89,55 +89,67 @@ export const proventosStorage = {
   }
 };
 
-export const brapiApiKeyStorage = {
-  get: () => {
-    try {
-      return localStorage.getItem(STORAGE_KEYS.BRAPI_API_KEY) || '';
-    } catch (error) {
-      console.error('Error reading Brapi API key from storage:', error);
-      return '';
-    }
-  },
+let serverApiKeys = null;
+let allowLegacyApiKeyFallback = true;
 
-  set: (apiKey) => {
+export const hasServerApiKeys = () => serverApiKeys !== null;
+
+const getLegacyApiKey = (storageKey) => {
+  try {
+    return localStorage.getItem(storageKey) || '';
+  } catch (error) {
+    console.error('Error reading a legacy API key from storage:', error);
+    return '';
+  }
+};
+
+export const getLegacyApiKeys = () => ({
+  brapi_api_key: getLegacyApiKey(STORAGE_KEYS.BRAPI_API_KEY),
+  coingecko_api_key: getLegacyApiKey(STORAGE_KEYS.COINGECKO_API_KEY)
+});
+
+export const setServerApiKeys = (
+  { brapi_api_key, coingecko_api_key } = {},
+  { allowLegacyFallback = true } = {}
+) => {
+  serverApiKeys = {
+    brapi_api_key: String(brapi_api_key || ''),
+    coingecko_api_key: String(coingecko_api_key || '')
+  };
+  allowLegacyApiKeyFallback = allowLegacyFallback;
+};
+
+export const clearLegacyApiKeys = (fields = ['brapi_api_key', 'coingecko_api_key']) => {
+  const storageKeys = {
+    brapi_api_key: STORAGE_KEYS.BRAPI_API_KEY,
+    coingecko_api_key: STORAGE_KEYS.COINGECKO_API_KEY
+  };
+  for (const field of fields) {
     try {
-      const normalizedApiKey = String(apiKey || '').trim();
-      if (normalizedApiKey) {
-        localStorage.setItem(STORAGE_KEYS.BRAPI_API_KEY, normalizedApiKey);
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.BRAPI_API_KEY);
-      }
+      localStorage.removeItem(storageKeys[field]);
     } catch (error) {
-      console.error('Error saving Brapi API key to storage:', error);
+      console.error(`Error clearing the legacy ${field} key:`, error);
     }
   }
 };
 
-const createApiKeyStorage = (storageKey, providerName) => ({
+export const brapiApiKeyStorage = {
   get: () => {
-    try {
-      return localStorage.getItem(storageKey) || '';
-    } catch (error) {
-      console.error(`Error reading ${providerName} API key from storage:`, error);
-      return '';
+    if (serverApiKeys && (!allowLegacyApiKeyFallback || serverApiKeys.brapi_api_key)) {
+      return serverApiKeys.brapi_api_key;
     }
-  },
-
-  set: (apiKey) => {
-    try {
-      const normalizedApiKey = String(apiKey || '').trim();
-      if (normalizedApiKey) {
-        localStorage.setItem(storageKey, normalizedApiKey);
-      } else {
-        localStorage.removeItem(storageKey);
-      }
-    } catch (error) {
-      console.error(`Error saving ${providerName} API key to storage:`, error);
-    }
+    return getLegacyApiKey(STORAGE_KEYS.BRAPI_API_KEY);
   }
-});
+};
 
-export const coinGeckoApiKeyStorage = createApiKeyStorage(STORAGE_KEYS.COINGECKO_API_KEY, 'CoinGecko');
+export const coinGeckoApiKeyStorage = {
+  get: () => {
+    if (serverApiKeys && (!allowLegacyApiKeyFallback || serverApiKeys.coingecko_api_key)) {
+      return serverApiKeys.coingecko_api_key;
+    }
+    return getLegacyApiKey(STORAGE_KEYS.COINGECKO_API_KEY);
+  }
+};
 
 // ── Clear all data ──────────────────────────────────────────────────────────
 export const clearAllStorage = () => {
@@ -146,6 +158,7 @@ export const clearAllStorage = () => {
     localStorage.removeItem(STORAGE_KEYS.PROVENTOS);
     localStorage.removeItem(STORAGE_KEYS.BRAPI_API_KEY);
     localStorage.removeItem(STORAGE_KEYS.COINGECKO_API_KEY);
+    setServerApiKeys({}, { allowLegacyFallback: false });
   } catch (error) {
     console.error('Error clearing storage:', error);
   }

@@ -130,7 +130,9 @@ const initializeDatabase = async () => {
       trial_started_at VARCHAR(40),
       plan VARCHAR(50) DEFAULT 'trial',
       plan_expires_at VARCHAR(40),
-      position_view VARCHAR(16) NOT NULL DEFAULT 'overview'
+      position_view VARCHAR(16) NOT NULL DEFAULT 'overview',
+      brapi_api_key VARCHAR(255) NULL,
+      coingecko_api_key VARCHAR(255) NULL
     ) ENGINE=InnoDB
   `);
 
@@ -183,6 +185,24 @@ const initializeDatabase = async () => {
       );
     }
     await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['user_preferences_v1']);
+  }
+
+  const [userApiKeysMigration] = await db.execute(
+    'SELECT name FROM schema_migrations WHERE name = ?',
+    ['user_api_keys_v1']
+  );
+  if (userApiKeysMigration.length === 0) {
+    for (const columnName of ['brapi_api_key', 'coingecko_api_key']) {
+      const [column] = await db.execute(`
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?
+      `, [columnName]);
+      if (column.length === 0) {
+        await db.execute(`ALTER TABLE users ADD COLUMN ${columnName} VARCHAR(255) NULL`);
+      }
+    }
+    await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['user_api_keys_v1']);
   }
 
   const [assetDetailsMigration] = await db.execute(
@@ -358,6 +378,27 @@ export const getUserById = async (id) => {
 
 export const updateUserPositionView = async (userId, positionView) => {
   await db.execute('UPDATE users SET position_view = ? WHERE id = ?', [positionView, userId]);
+  return getUserById(userId);
+};
+
+export const updateUserPreferences = async (userId, preferences) => {
+  const updates = [];
+  const values = [];
+  const supportedFields = {
+    position_view: 'position_view',
+    brapi_api_key: 'brapi_api_key',
+    coingecko_api_key: 'coingecko_api_key'
+  };
+
+  for (const [field, column] of Object.entries(supportedFields)) {
+    if (Object.hasOwn(preferences, field)) {
+      updates.push(`${column} = ?`);
+      values.push(preferences[field]);
+    }
+  }
+
+  if (updates.length === 0) return getUserById(userId);
+  await db.execute(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, [...values, userId]);
   return getUserById(userId);
 };
 

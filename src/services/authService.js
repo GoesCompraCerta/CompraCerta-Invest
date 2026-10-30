@@ -1,4 +1,7 @@
+import { hasServerApiKeys, setServerApiKeys } from './storageService.js';
+
 const TOKEN_KEY = 'goes_compra_certa_auth_token';
+let apiKeysRequest = null;
 
 const request = async (path, options = {}) => {
   const response = await fetch(path, {
@@ -102,6 +105,29 @@ export const getMe = async () => {
     if (error.status === 401) removeToken();
     throw error;
   }
+};
+
+export const ensureApiKeysLoaded = async () => {
+  if (hasServerApiKeys()) return;
+  if (!apiKeysRequest) {
+    apiKeysRequest = getMe()
+      .then((profile) => setServerApiKeys(profile.user || {}))
+      .finally(() => { apiKeysRequest = null; });
+  }
+  await apiKeysRequest;
+};
+
+export const updateApiKeys = async (apiKeys) => {
+  const token = getToken();
+  if (!token) throw new Error('Sessão não encontrada.');
+
+  const profile = await request('/api/auth/preferences', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(apiKeys)
+  });
+  setServerApiKeys(profile.user || {}, { allowLegacyFallback: false });
+  return profile;
 };
 
 export const updatePositionView = async (positionView) => {

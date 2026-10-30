@@ -45,6 +45,7 @@ import { calculatePortfolioTotals } from './services/calculationService';
 // Constants & Utils
 import { TRANSLATIONS } from './constants/translations';
 import * as authService from './services/authService';
+import { setServerApiKeys } from './services/storageService';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Main App Component
@@ -88,6 +89,7 @@ export default function App() {
 
     authService.getMe()
       .then(async (profile) => {
+        setServerApiKeys(profile.user || {});
         let status = null;
         try {
           status = await authService.getPlanStatus();
@@ -198,6 +200,7 @@ export default function App() {
     let trialExpired = false;
     try {
       const profile = await authService.getMe();
+      setServerApiKeys(profile.user || {});
       setPositionView(profile.user?.position_view === 'class' ? 'class' : 'overview');
       const status = await authService.getPlanStatus();
       setPlanStatus(status);

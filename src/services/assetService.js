@@ -1,13 +1,7 @@
 import { fetchBrapiAssetData } from './brapiService';
 import { CRYPTO_SYMBOLS } from '../utils/cryptoUtils';
-
-const getStorageKey = (keyName) => {
-  try {
-    return localStorage.getItem(keyName) || '';
-  } catch {
-    return '';
-  }
-};
+import { ensureApiKeysLoaded } from './authService';
+import { coinGeckoApiKeyStorage } from './storageService';
 
 export const sanitizeTicker = (ticker) => String(ticker || '')
   .trim()
@@ -74,6 +68,7 @@ export const fetchExchangeRates = async () => {
 
 export const fetchCoinGeckoData = async (ticker) => {
   try {
+    await ensureApiKeysLoaded();
     const cleanTicker = String(ticker || '')
       .toUpperCase()
       .replace('/BRL', '')
@@ -82,7 +77,7 @@ export const fetchCoinGeckoData = async (ticker) => {
       .replace('-', '')
       .trim();
 
-    const apiKey = getStorageKey('goes_compra_certa_coingecko_api_key');
+    const apiKey = coinGeckoApiKeyStorage.get();
     const headers = { Accept: 'application/json' };
     if (apiKey) headers['x-cg-demo-api-key'] = apiKey;
 
