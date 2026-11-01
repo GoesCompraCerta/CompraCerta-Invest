@@ -145,11 +145,14 @@ export const updateDisableIntro = async (disableIntro) => {
   const token = getToken();
   if (!token) throw new Error('Sessão não encontrada.');
 
+  const payload = { disable_intro: disableIntro };
+  console.log('ENVIANDO PARA API:', payload);
+
   return request('/api/auth/preferences', {
     method: 'PUT',
     cache: 'no-store',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ disable_intro: disableIntro })
+    body: JSON.stringify(payload)
   });
 };
 

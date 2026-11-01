@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Download, ExternalLink, Eye, EyeOff, Moon, SkipForward, Sun, Trash2 } from 'lucide-react';
+import { Check, Download, ExternalLink, Eye, EyeOff, Globe, Moon, SkipForward, Sun, Trash2 } from 'lucide-react';
 import {
   activateProForTest,
   getMe,
@@ -374,9 +374,14 @@ export default function UserSettingsPage({
                 <p className="font-bold">{t.languageLabel}</p>
                 <p className={`text-sm ${mutedClass}`}>{lang === 'pt' ? 'Português (Brasil)' : 'English'}</p>
               </div>
-              <div className="flex gap-1 rounded-lg bg-slate-800 p-1">
-                {['pt', 'en'].map((option) => <button key={option} type="button" onClick={() => setLang(option)} className={`rounded-md px-3 py-1 text-xs font-black ${lang === option ? themeStyle.btn : 'text-slate-400'}`}>{option.toUpperCase()}</button>)}
-              </div>
+              <button
+                type="button"
+                onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
+                className="flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white"
+              >
+                <Globe className="h-4 w-4" aria-hidden="true" />
+                {lang === 'pt' ? 'Português (BR)' : 'English'}
+              </button>
             </div>
             <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
               <div><p className="font-bold">{t.themeLabel}</p><p className={`text-sm ${mutedClass}`}>{isDarkMode ? t.darkTheme : t.lightTheme}</p></div>

@@ -142,6 +142,7 @@ addTest(
       return requestPath === '/api/auth/preferences'
         && requestOptions.method === 'PUT'
         && requestOptions.cache === 'no-store'
+        && JSON.stringify(payload) === JSON.stringify({ disable_intro: true })
         && payload.disable_intro === true
         && Object.keys(payload).length === 1
         && response.user.disable_intro === true;
