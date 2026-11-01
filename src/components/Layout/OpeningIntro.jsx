@@ -8,6 +8,7 @@ export default function OpeningIntro({ onFinish, t }) {
   const introTimeoutRef = useRef(null);
   const [isClosing, setIsClosing] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
   const startFadeOut = () => {
     setIsClosing(true);
@@ -51,6 +52,13 @@ export default function OpeningIntro({ onFinish, t }) {
     };
   }, []);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const updateMobile = () => setIsMobile(mediaQuery.matches);
+    mediaQuery.addEventListener('change', updateMobile);
+    return () => mediaQuery.removeEventListener('change', updateMobile);
+  }, []);
+
   const handleAudioToggle = () => {
     const video = videoRef.current;
 
@@ -60,24 +68,16 @@ export default function OpeningIntro({ onFinish, t }) {
     setIsMuted(video.muted);
   };
 
-  const videoSrc = '/1000131540.mp4';
+  const videoSrc = isMobile ? '/abertura-mobile.mp4' : '/1000131540.mp4';
   console.log('Vídeo de abertura src:', videoSrc);
 
   return (
     <div className={`abertura-overlay fixed inset-0 z-[100] ${isClosing ? 'sumir' : ''}`}>
       <div className="relative h-screen w-screen overflow-hidden bg-black">
         <video
-          className="absolute inset-0 h-full w-full object-cover blur-md opacity-60 md:hidden z-0"
-          autoPlay
-          muted
-          playsInline
-          preload="auto"
-        >
-          <source src={videoSrc} type="video/mp4" />
-        </video>
-        <video
           ref={videoRef}
-          className="absolute inset-0 h-full w-full object-contain md:object-cover z-10"
+          key={videoSrc}
+          className="absolute inset-0 z-0 h-full w-full object-cover"
           autoPlay
           muted={isMuted}
           playsInline
