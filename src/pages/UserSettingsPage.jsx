@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Download, ExternalLink, Eye, EyeOff, Moon, Sun, Trash2 } from 'lucide-react';
+import { Check, Download, ExternalLink, Eye, EyeOff, Moon, SkipForward, Sun, Trash2 } from 'lucide-react';
 import {
   activateProForTest,
   getMe,
@@ -395,14 +395,13 @@ export default function UserSettingsPage({
               </div>
               <button
                 type="button"
-                role="switch"
-                aria-checked={disableIntro}
-                aria-label={t.disableIntroLabel}
+                aria-pressed={disableIntro}
                 disabled={isLoadingApiKeys || isSavingDisableIntro}
                 onClick={() => handleDisableIntroChange(!disableIntro)}
-                className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${disableIntro ? 'bg-emerald-500' : 'bg-slate-400'}`}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60 ${disableIntro ? themeStyle.btn : 'bg-slate-700 text-white'}`}
               >
-                <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${disableIntro ? 'translate-x-5' : ''}`} />
+                <SkipForward className="h-4 w-4" aria-hidden="true" />
+                {disableIntro ? t.active : t.inactive}
               </button>
             </div>
           </div>

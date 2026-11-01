@@ -141,6 +141,7 @@ addTest(
       const payload = JSON.parse(requestOptions.body);
       return requestPath === '/api/auth/preferences'
         && requestOptions.method === 'PUT'
+        && requestOptions.cache === 'no-store'
         && payload.disable_intro === true
         && Object.keys(payload).length === 1
         && response.user.disable_intro === true;

@@ -337,8 +337,21 @@ const handleUpdateAuthPreferences = async (request, response) => {
     return;
   }
 
+  const loggedPreferences = {};
+  for (const field of ['position_view', 'disable_intro']) {
+    if (Object.hasOwn(payload || {}, field)) loggedPreferences[field] = payload[field];
+  }
+  for (const field of ['brapi_api_key', 'coingecko_api_key']) {
+    if (Object.hasOwn(payload || {}, field)) loggedPreferences[field] = '[REDACTED]';
+  }
+  console.info('[auth/preferences] received body:', loggedPreferences);
+
   const preferences = {};
-  if (payload?.position_view !== undefined) {
+  if (
+    Object.hasOwn(payload || {}, 'position_view')
+    && payload.position_view !== null
+    && payload.position_view !== undefined
+  ) {
     if (!['overview', 'class'].includes(payload.position_view)) {
       sendJson(response, 400, { error: 'A visão de posicionamento informada é inválida.' });
       return;

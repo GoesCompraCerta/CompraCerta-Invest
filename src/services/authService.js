@@ -147,6 +147,7 @@ export const updateDisableIntro = async (disableIntro) => {
 
   return request('/api/auth/preferences', {
     method: 'PUT',
+    cache: 'no-store',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ disable_intro: disableIntro })
   });
