@@ -141,6 +141,17 @@ export const updatePositionView = async (positionView) => {
   });
 };
 
+export const updateDisableIntro = async (disableIntro) => {
+  const token = getToken();
+  if (!token) throw new Error('Sessão não encontrada.');
+
+  return request('/api/auth/preferences', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ disable_intro: disableIntro })
+  });
+};
+
 export const getPlanStatus = async () => {
   const token = getToken();
   if (!token) throw new Error('Sessão não encontrada.');

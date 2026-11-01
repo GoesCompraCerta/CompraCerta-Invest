@@ -158,6 +158,7 @@ const toPublicUser = (user) => ({
   plan: user.plan,
   plan_expires_at: user.plan_expires_at,
   position_view: user.position_view || 'overview',
+  disable_intro: Boolean(user.disable_intro),
   brapi_api_key: user.brapi_api_key || '',
   coingecko_api_key: user.coingecko_api_key || ''
 });
@@ -345,6 +346,14 @@ const handleUpdateAuthPreferences = async (request, response) => {
     preferences.position_view = payload.position_view;
   }
 
+  if (Object.hasOwn(payload || {}, 'disable_intro')) {
+    if (typeof payload.disable_intro !== 'boolean') {
+      sendJson(response, 400, { error: 'A preferência para pular a abertura é inválida.' });
+      return;
+    }
+    preferences.disable_intro = payload.disable_intro ? 1 : 0;
+  }
+
   for (const field of ['brapi_api_key', 'coingecko_api_key']) {
     if (!Object.hasOwn(payload || {}, field)) continue;
     const apiKey = payload[field];
@@ -356,7 +365,7 @@ const handleUpdateAuthPreferences = async (request, response) => {
   }
 
   if (Object.keys(preferences).length === 0) {
-    sendJson(response, 400, { error: 'A visão de posicionamento informada é inválida.' });
+    sendJson(response, 400, { error: 'Nenhuma preferência válida foi informada.' });
     return;
   }
 

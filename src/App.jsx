@@ -53,6 +53,7 @@ import { setServerApiKeys } from './services/storageService';
 
 export default function App() {
   const [showOpeningIntro, setShowOpeningIntro] = useState(true);
+  const [disableIntro, setDisableIntro] = useState(false);
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const [isAuthenticated, setIsAuthenticated] = useState(() => authService.isAuthenticated());
   const [isAuthChecking, setIsAuthChecking] = useState(() => authService.isAuthenticated());
@@ -80,6 +81,8 @@ export default function App() {
     }
     if (!authService.isAuthenticated()) {
       setIsAuthenticated(false);
+      setDisableIntro(false);
+      setShowOpeningIntro(false);
       setPlanStatus(null);
       setIsTrialExpired(false);
       setPositionView('overview');
@@ -97,6 +100,8 @@ export default function App() {
           if (error.status === 401) throw error;
         }
         if (isMounted) {
+          const userDisablesIntro = Boolean(profile.user?.disable_intro);
+          setDisableIntro(userDisablesIntro);
           setPositionView(profile.user?.position_view === 'class' ? 'class' : 'overview');
           setPlanStatus(status);
           const trialExpired = status?.plan === 'trial' && status.daysRemaining <= 0;
@@ -198,18 +203,22 @@ export default function App() {
     setShowOpeningIntro(true);
     refreshAssets();
     let trialExpired = false;
+    let userDisablesIntro = false;
     try {
       const profile = await authService.getMe();
       setServerApiKeys(profile.user || {});
+      userDisablesIntro = Boolean(profile.user?.disable_intro);
+      setDisableIntro(userDisablesIntro);
       setPositionView(profile.user?.position_view === 'class' ? 'class' : 'overview');
       const status = await authService.getPlanStatus();
       setPlanStatus(status);
       trialExpired = status?.plan === 'trial' && status.daysRemaining <= 0;
       setIsTrialExpired(trialExpired);
-      setShowOpeningIntro(!trialExpired);
+      setShowOpeningIntro(!trialExpired && !userDisablesIntro);
     } catch {
       setPlanStatus(null);
       setIsTrialExpired(false);
+      setDisableIntro(false);
       setPositionView('overview');
     } finally {
       setIsAuthChecking(false);
@@ -224,6 +233,7 @@ export default function App() {
       authService.removeToken();
     }
     setIsAuthenticated(false);
+    setDisableIntro(false);
     setPlanStatus(null);
     setIsTrialExpired(false);
     clearAssets();
@@ -325,7 +335,9 @@ export default function App() {
   // ═════════════════════════════════════════════════════════════════════════════
   return (
     <>
-      {showOpeningIntro && <OpeningIntro t={t} onFinish={() => setShowOpeningIntro(false)} />}
+      {isAuthenticated && showOpeningIntro && !disableIntro && (
+        <OpeningIntro t={t} onFinish={() => setShowOpeningIntro(false)} />
+      )}
       <ProtectedRoute
         isAuthenticated={isAuthenticated}
         isLoading={isAuthChecking}
@@ -528,6 +540,7 @@ export default function App() {
             themeStyle={themeStyle}
             cardClass={cardClass}
             onAccountDeleted={handleLogout}
+            onDisableIntroChange={setDisableIntro}
           />
         )}
 

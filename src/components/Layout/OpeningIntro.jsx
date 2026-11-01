@@ -66,7 +66,8 @@ export default function OpeningIntro({ onFinish, t }) {
     <div className={`abertura-overlay fixed inset-0 z-[100] flex h-screen w-screen items-center justify-center bg-black ${isClosing ? 'sumir' : ''}`}>
       <video
         ref={videoRef}
-        className="h-full w-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover object-center"
+        autoPlay
         src={introVideo}
         muted={isMuted}
         playsInline
@@ -75,7 +76,7 @@ export default function OpeningIntro({ onFinish, t }) {
         onEnded={handleVideoEnd}
         aria-label={t.openingVideoLabel}
       />
-      <div className="absolute bottom-5 right-5 flex gap-2">
+      <div className="absolute z-50 bottom-5 right-5 flex gap-2">
         <button
           type="button"
           onClick={handleSkip}

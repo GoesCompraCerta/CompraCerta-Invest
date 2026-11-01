@@ -27,7 +27,7 @@ import {
   listProventos,
   updateProvento as updateProventoRequest
 } from './src/services/proventosService.js';
-import { updatePositionView } from './src/services/authService.js';
+import { updateDisableIntro, updatePositionView } from './src/services/authService.js';
 import { parseNumberWithMultiplier } from './src/utils/formatNumbers.js';
 
 const tests = [];
@@ -105,6 +105,45 @@ addTest(
         && requestOptions.headers.Authorization === 'Bearer test-token'
         && JSON.parse(requestOptions.body).position_view === 'class'
         && response.user.position_view === 'class';
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalLocalStorage === undefined) {
+        delete globalThis.localStorage;
+      } else {
+        globalThis.localStorage = originalLocalStorage;
+      }
+    }
+  }
+);
+
+addTest(
+  'Preferência para pular abertura é enviada sem alterar outras preferências',
+  {},
+  'PUT /api/auth/preferences envia somente disable_intro',
+  async () => {
+    const originalFetch = globalThis.fetch;
+    const originalLocalStorage = globalThis.localStorage;
+    let requestPath;
+    let requestOptions;
+
+    globalThis.localStorage = { getItem: () => 'test-token' };
+    globalThis.fetch = async (path, options) => {
+      requestPath = path;
+      requestOptions = options;
+      return {
+        ok: true,
+        json: async () => ({ user: { disable_intro: true, position_view: 'class' } })
+      };
+    };
+
+    try {
+      const response = await updateDisableIntro(true);
+      const payload = JSON.parse(requestOptions.body);
+      return requestPath === '/api/auth/preferences'
+        && requestOptions.method === 'PUT'
+        && payload.disable_intro === true
+        && Object.keys(payload).length === 1
+        && response.user.disable_intro === true;
     } finally {
       globalThis.fetch = originalFetch;
       if (originalLocalStorage === undefined) {

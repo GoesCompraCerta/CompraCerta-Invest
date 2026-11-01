@@ -131,6 +131,7 @@ const initializeDatabase = async () => {
       plan VARCHAR(50) DEFAULT 'trial',
       plan_expires_at VARCHAR(40),
       position_view VARCHAR(16) NOT NULL DEFAULT 'overview',
+      disable_intro TINYINT(1) NOT NULL DEFAULT 0,
       brapi_api_key VARCHAR(255) NULL,
       coingecko_api_key VARCHAR(255) NULL
     ) ENGINE=InnoDB
@@ -203,6 +204,24 @@ const initializeDatabase = async () => {
       }
     }
     await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['user_api_keys_v1']);
+  }
+
+  const [disableIntroMigration] = await db.execute(
+    'SELECT name FROM schema_migrations WHERE name = ?',
+    ['disable_intro_v1']
+  );
+  if (disableIntroMigration.length === 0) {
+    const [disableIntroColumn] = await db.execute(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'disable_intro'
+    `);
+    if (disableIntroColumn.length === 0) {
+      await db.execute(
+        'ALTER TABLE users ADD COLUMN disable_intro TINYINT(1) NOT NULL DEFAULT 0'
+      );
+    }
+    await db.execute('INSERT INTO schema_migrations (name) VALUES (?)', ['disable_intro_v1']);
   }
 
   const [assetDetailsMigration] = await db.execute(
@@ -386,6 +405,7 @@ export const updateUserPreferences = async (userId, preferences) => {
   const values = [];
   const supportedFields = {
     position_view: 'position_view',
+    disable_intro: 'disable_intro',
     brapi_api_key: 'brapi_api_key',
     coingecko_api_key: 'coingecko_api_key'
   };

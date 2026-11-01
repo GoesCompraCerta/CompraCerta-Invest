@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Download, ExternalLink, Eye, EyeOff, Moon, Sun, Trash2 } from 'lucide-react';
-import { activateProForTest, getMe, updateApiKeys } from '../services/authService';
+import {
+  activateProForTest,
+  getMe,
+  updateApiKeys,
+  updateDisableIntro
+} from '../services/authService';
 import { deleteAccount } from '../services/lgpdService';
 import { exportPortfolioToExcel } from '../services/calculationService';
 import {
@@ -29,12 +34,17 @@ export default function UserSettingsPage({
   setPrivacyMode,
   themeStyle,
   cardClass,
-  onAccountDeleted
+  onAccountDeleted,
+  onDisableIntroChange
 }) {
   const [activeTab, setActiveTab] = useState('account');
   const [apiKeySaved, setApiKeySaved] = useState(false);
   const [apiKeyError, setApiKeyError] = useState('');
   const [isLoadingApiKeys, setIsLoadingApiKeys] = useState(true);
+  const [disableIntro, setDisableIntro] = useState(false);
+  const [isSavingDisableIntro, setIsSavingDisableIntro] = useState(false);
+  const [disableIntroSaved, setDisableIntroSaved] = useState(false);
+  const [disableIntroError, setDisableIntroError] = useState('');
   const [testActivationMessage, setTestActivationMessage] = useState('');
   const [isActivatingTestPlan, setIsActivatingTestPlan] = useState(false);
   const [showBrapiApiKey, setShowBrapiApiKey] = useState(false);
@@ -56,6 +66,7 @@ export default function UserSettingsPage({
         const profile = await getMe();
         const user = profile.user || {};
         setServerApiKeys(user);
+        if (isMounted) setDisableIntro(Boolean(user.disable_intro));
         const legacyKeys = getLegacyApiKeys();
         const migration = {};
 
@@ -109,6 +120,27 @@ export default function UserSettingsPage({
       setApiKeySaved(true);
     } catch (error) {
       setApiKeyError(error.message);
+    }
+  };
+
+  const handleDisableIntroChange = async (nextValue) => {
+    const previousValue = disableIntro;
+    setDisableIntro(nextValue);
+    setIsSavingDisableIntro(true);
+    setDisableIntroSaved(false);
+    setDisableIntroError('');
+
+    try {
+      const profile = await updateDisableIntro(nextValue);
+      const savedValue = Boolean(profile.user?.disable_intro);
+      setDisableIntro(savedValue);
+      onDisableIntroChange?.(savedValue);
+      setDisableIntroSaved(true);
+    } catch (error) {
+      setDisableIntro(previousValue);
+      setDisableIntroError(error.message);
+    } finally {
+      setIsSavingDisableIntro(false);
     }
   };
 
@@ -291,6 +323,25 @@ export default function UserSettingsPage({
       {activeTab === 'preferences' && (
         <div className={`space-y-4 rounded-2xl border p-5 md:p-6 ${cardClass}`}>
           <h3 className="text-xl font-black">{t.prefTitle}</h3>
+          <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
+            <div>
+              <p className="font-bold">{t.disableIntroLabel}</p>
+              <p className={`text-sm ${mutedClass}`}>{t.disableIntroDescription}</p>
+              {disableIntroSaved && <p className="mt-1 text-sm font-bold text-emerald-500">{t.disableIntroSaved}</p>}
+              {disableIntroError && <p role="alert" className="mt-1 text-sm text-red-500">{disableIntroError}</p>}
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={disableIntro}
+              aria-label={t.disableIntroLabel}
+              disabled={isLoadingApiKeys || isSavingDisableIntro}
+              onClick={() => handleDisableIntroChange(!disableIntro)}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${disableIntro ? 'bg-emerald-500' : 'bg-slate-400'}`}
+            >
+              <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${disableIntro ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
           <form onSubmit={handleSaveApiKey} className={`rounded-xl border p-4 ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
             <div className="mb-3">
               <p className="font-bold">{t.brapiIntegrationTitle}</p>
