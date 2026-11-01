@@ -323,25 +323,6 @@ export default function UserSettingsPage({
       {activeTab === 'preferences' && (
         <div className={`space-y-4 rounded-2xl border p-5 md:p-6 ${cardClass}`}>
           <h3 className="text-xl font-black">{t.prefTitle}</h3>
-          <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
-            <div>
-              <p className="font-bold">{t.disableIntroLabel}</p>
-              <p className={`text-sm ${mutedClass}`}>{t.disableIntroDescription}</p>
-              {disableIntroSaved && <p className="mt-1 text-sm font-bold text-emerald-500">{t.disableIntroSaved}</p>}
-              {disableIntroError && <p role="alert" className="mt-1 text-sm text-red-500">{disableIntroError}</p>}
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={disableIntro}
-              aria-label={t.disableIntroLabel}
-              disabled={isLoadingApiKeys || isSavingDisableIntro}
-              onClick={() => handleDisableIntroChange(!disableIntro)}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${disableIntro ? 'bg-emerald-500' : 'bg-slate-400'}`}
-            >
-              <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${disableIntro ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
           <form onSubmit={handleSaveApiKey} className={`rounded-xl border p-4 ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
             <div className="mb-3">
               <p className="font-bold">{t.brapiIntegrationTitle}</p>
@@ -387,22 +368,43 @@ export default function UserSettingsPage({
               </div>
             </div>
           </form>
-          <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
-            <div>
-              <p className="font-bold">{t.languageLabel}</p>
-              <p className={`text-sm ${mutedClass}`}>{lang === 'pt' ? 'Português (Brasil)' : 'English'}</p>
+          <div className="space-y-4">
+            <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
+              <div>
+                <p className="font-bold">{t.disableIntroLabel}</p>
+                <p className={`text-sm ${mutedClass}`}>{t.disableIntroDescription}</p>
+                {disableIntroSaved && <p className="mt-1 text-sm font-bold text-emerald-500">{t.disableIntroSaved}</p>}
+                {disableIntroError && <p role="alert" className="mt-1 text-sm text-red-500">{disableIntroError}</p>}
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={disableIntro}
+                aria-label={t.disableIntroLabel}
+                disabled={isLoadingApiKeys || isSavingDisableIntro}
+                onClick={() => handleDisableIntroChange(!disableIntro)}
+                className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${disableIntro ? 'bg-emerald-500' : 'bg-slate-400'}`}
+              >
+                <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${disableIntro ? 'translate-x-5' : ''}`} />
+              </button>
             </div>
-            <div className="flex gap-1 rounded-lg bg-slate-800 p-1">
-              {['pt', 'en'].map((option) => <button key={option} type="button" onClick={() => setLang(option)} className={`rounded-md px-3 py-1 text-xs font-black ${lang === option ? themeStyle.btn : 'text-slate-400'}`}>{option.toUpperCase()}</button>)}
+            <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
+              <div>
+                <p className="font-bold">{t.languageLabel}</p>
+                <p className={`text-sm ${mutedClass}`}>{lang === 'pt' ? 'Português (Brasil)' : 'English'}</p>
+              </div>
+              <div className="flex gap-1 rounded-lg bg-slate-800 p-1">
+                {['pt', 'en'].map((option) => <button key={option} type="button" onClick={() => setLang(option)} className={`rounded-md px-3 py-1 text-xs font-black ${lang === option ? themeStyle.btn : 'text-slate-400'}`}>{option.toUpperCase()}</button>)}
+              </div>
             </div>
-          </div>
-          <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
-            <div><p className="font-bold">{t.themeLabel}</p><p className={`text-sm ${mutedClass}`}>{isDarkMode ? t.darkTheme : t.lightTheme}</p></div>
-            <button type="button" onClick={() => setIsDarkMode((current) => !current)} className="flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white"><span aria-hidden="true">{isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</span>{isDarkMode ? t.lightTheme : t.darkTheme}</button>
-          </div>
-          <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
-            <div><p className="font-bold">{t.privacyLabel}</p><p className={`text-sm ${mutedClass}`}>{privacyMode ? t.active : t.inactive}</p></div>
-            <button type="button" onClick={() => setPrivacyMode((current) => !current)} className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${privacyMode ? themeStyle.btn : 'bg-slate-700 text-white'}`}><span aria-hidden="true">{privacyMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</span>{privacyMode ? t.active : t.inactive}</button>
+            <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
+              <div><p className="font-bold">{t.themeLabel}</p><p className={`text-sm ${mutedClass}`}>{isDarkMode ? t.darkTheme : t.lightTheme}</p></div>
+              <button type="button" onClick={() => setIsDarkMode((current) => !current)} className="flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white"><span aria-hidden="true">{isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</span>{isDarkMode ? t.lightTheme : t.darkTheme}</button>
+            </div>
+            <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
+              <div><p className="font-bold">{t.privacyLabel}</p><p className={`text-sm ${mutedClass}`}>{privacyMode ? t.active : t.inactive}</p></div>
+              <button type="button" onClick={() => setPrivacyMode((current) => !current)} className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${privacyMode ? themeStyle.btn : 'bg-slate-700 text-white'}`}><span aria-hidden="true">{privacyMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</span>{privacyMode ? t.active : t.inactive}</button>
+            </div>
           </div>
         </div>
       )}
