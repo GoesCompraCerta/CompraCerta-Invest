@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import introVideo from '../../../abertura do programa/1000131540.mp4';
 
 export default function OpeningIntro({ onFinish, t }) {
   const videoRef = useRef(null);
@@ -38,11 +37,10 @@ export default function OpeningIntro({ onFinish, t }) {
 
     if (!video || introTimeoutRef.current !== null || transitionStartedRef.current) return;
 
-    video.playbackRate = 1.2;
     video.play().catch((error) => {
       console.error('Não foi possível iniciar o vídeo de abertura:', error);
     });
-    introTimeoutRef.current = window.setTimeout(handleVideoEnd, 4500);
+    introTimeoutRef.current = window.setTimeout(handleVideoEnd, 5200);
   };
 
   useEffect(() => {
@@ -62,37 +60,53 @@ export default function OpeningIntro({ onFinish, t }) {
     setIsMuted(video.muted);
   };
 
+  const videoSrc = '/1000131540.mp4';
+  console.log('Vídeo de abertura src:', videoSrc);
+
   return (
-    <div className={`abertura-overlay fixed inset-0 z-[100] flex h-screen w-screen items-center justify-center bg-black ${isClosing ? 'sumir' : ''}`}>
-      <video
-        ref={videoRef}
-        className="absolute inset-0 w-full h-full object-cover object-center"
-        autoPlay
-        src={introVideo}
-        muted={isMuted}
-        playsInline
-        preload="auto"
-        onCanPlay={handleCanPlay}
-        onEnded={handleVideoEnd}
-        aria-label={t.openingVideoLabel}
-      />
-      <div className="absolute z-50 bottom-5 right-5 flex gap-2">
-        <button
-          type="button"
-          onClick={handleSkip}
-          className="rounded-md bg-black/60 px-4 py-2 text-sm text-white transition hover:bg-black/80"
+    <div className={`abertura-overlay fixed inset-0 z-[100] ${isClosing ? 'sumir' : ''}`}>
+      <div className="relative h-screen w-screen overflow-hidden bg-black">
+        <video
+          className="absolute inset-0 h-full w-full object-cover blur-md opacity-60 md:hidden z-0"
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
         >
-          {t.skipOpening}
-        </button>
-        <button
-          type="button"
-          onClick={handleAudioToggle}
-          className="rounded-md bg-black/60 px-3 py-2 text-lg text-white transition hover:bg-black/80"
-          title={isMuted ? t.turnSoundOn : t.turnSoundOff}
-          aria-label={isMuted ? t.turnSoundOn : t.turnSoundOff}
+          <source src={videoSrc} type="video/mp4" />
+        </video>
+        <video
+          ref={videoRef}
+          className="absolute inset-0 h-full w-full object-contain md:object-cover z-10"
+          autoPlay
+          muted={isMuted}
+          playsInline
+          preload="auto"
+          onCanPlay={handleCanPlay}
+          onEnded={handleVideoEnd}
+          onError={(event) => console.error('Erro no vídeo:', event.currentTarget.error)}
+          aria-label={t.openingVideoLabel}
         >
-          {isMuted ? '🔇' : '🎵'}
-        </button>
+          <source src={videoSrc} type="video/mp4" />
+        </video>
+        <div className="absolute z-50 bottom-5 right-5 flex gap-2">
+          <button
+            type="button"
+            onClick={handleSkip}
+            className="rounded-md bg-black/60 px-4 py-2 text-sm text-white transition hover:bg-black/80"
+          >
+            {t.skipOpening}
+          </button>
+          <button
+            type="button"
+            onClick={handleAudioToggle}
+            className="rounded-md bg-black/60 px-3 py-2 text-lg text-white transition hover:bg-black/80"
+            title={isMuted ? t.turnSoundOn : t.turnSoundOff}
+            aria-label={isMuted ? t.turnSoundOn : t.turnSoundOff}
+          >
+            {isMuted ? '🔇' : '🎵'}
+          </button>
+        </div>
       </div>
     </div>
   );
