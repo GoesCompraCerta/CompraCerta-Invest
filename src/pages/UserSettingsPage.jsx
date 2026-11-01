@@ -296,7 +296,7 @@ export default function UserSettingsPage({
               type="button"
               onClick={handleExportExcel}
               disabled={isExportingExcel}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 ${themeStyle.btn}`}
+              className={`inline-flex w-44 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 ${themeStyle.btn}`}
             >
               <Download className="h-4 w-4" aria-hidden="true" />
               {isExportingExcel ? t.excelExporting : t.exportMyDataExcel}
@@ -311,7 +311,7 @@ export default function UserSettingsPage({
             <button
               type="button"
               onClick={openDeleteAccountModal}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-700"
+              className="inline-flex w-44 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-700"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {t.deleteAccountButton}
@@ -377,7 +377,7 @@ export default function UserSettingsPage({
               <button
                 type="button"
                 onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
-                className="flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white"
+                className="flex w-44 items-center justify-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white"
               >
                 <Globe className="h-4 w-4" aria-hidden="true" />
                 {lang === 'pt' ? 'Português (BR)' : 'English'}
@@ -385,11 +385,11 @@ export default function UserSettingsPage({
             </div>
             <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
               <div><p className="font-bold">{t.themeLabel}</p><p className={`text-sm ${mutedClass}`}>{isDarkMode ? t.darkTheme : t.lightTheme}</p></div>
-              <button type="button" onClick={() => setIsDarkMode((current) => !current)} className="flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white"><span aria-hidden="true">{isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</span>{isDarkMode ? t.lightTheme : t.darkTheme}</button>
+              <button type="button" onClick={() => setIsDarkMode((current) => !current)} className="flex w-44 items-center justify-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white"><span aria-hidden="true">{isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</span>{isDarkMode ? t.lightTheme : t.darkTheme}</button>
             </div>
             <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
               <div><p className="font-bold">{t.privacyLabel}</p><p className={`text-sm ${mutedClass}`}>{privacyMode ? t.active : t.inactive}</p></div>
-              <button type="button" onClick={() => setPrivacyMode((current) => !current)} className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${privacyMode ? themeStyle.btn : 'bg-slate-700 text-white'}`}><span aria-hidden="true">{privacyMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</span>{privacyMode ? t.active : t.inactive}</button>
+              <button type="button" onClick={() => setPrivacyMode((current) => !current)} className={`flex w-44 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${privacyMode ? themeStyle.btn : 'bg-slate-700 text-white'}`}><span aria-hidden="true">{privacyMode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</span>{privacyMode ? t.active : t.inactive}</button>
             </div>
             <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${isDarkMode ? 'border-slate-700 bg-slate-900/70' : 'border-slate-200 bg-slate-50'}`}>
               <div>
@@ -403,7 +403,7 @@ export default function UserSettingsPage({
                 aria-pressed={disableIntro}
                 disabled={isLoadingApiKeys || isSavingDisableIntro}
                 onClick={() => handleDisableIntroChange(!disableIntro)}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60 ${disableIntro ? themeStyle.btn : 'bg-slate-700 text-white'}`}
+                className={`flex w-44 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60 ${disableIntro ? themeStyle.btn : 'bg-slate-700 text-white'}`}
               >
                 <SkipForward className="h-4 w-4" aria-hidden="true" />
                 {disableIntro ? t.active : t.inactive}

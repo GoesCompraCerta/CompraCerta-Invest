@@ -159,6 +159,7 @@ const toPublicUser = (user) => ({
   plan_expires_at: user.plan_expires_at,
   position_view: user.position_view || 'overview',
   disable_intro: Boolean(user.disable_intro),
+  is_admin: Boolean(user.is_admin),
   brapi_api_key: user.brapi_api_key || '',
   coingecko_api_key: user.coingecko_api_key || ''
 });
@@ -1115,6 +1116,17 @@ const toYahooChartSymbol = (ticker) => {
   return normalized.startsWith('^') || normalized.includes('.') ? normalized : normalized;
 };
 
+const normalizeYahooMonthlyQuotes = (quotes) => (Array.isArray(quotes) ? quotes : [])
+  .filter((quote) => (
+    quote?.date
+    && typeof quote.close === 'number'
+    && Number.isFinite(quote.close)
+    && quote.close > 0
+  ))
+  .map((quote) => ({ date: new Date(quote.date), close: quote.close }))
+  .filter((quote) => !Number.isNaN(quote.date.getTime()))
+  .sort((first, second) => first.date - second.date);
+
 const fetchYahooMonthlyQuotes = async (ticker, startDate, endDate, market = 'auto') => {
   const symbol = toYahooChartSymbol(ticker);
   const candidates = symbol.startsWith('^') || symbol.includes('.')
@@ -1130,13 +1142,11 @@ const fetchYahooMonthlyQuotes = async (ticker, startDate, endDate, market = 'aut
     console.warn('[market-cache] Não foi possível ler o histórico Yahoo:', error.message);
   }
   const cachedValue = Array.isArray(cachedEntry?.value?.quotes) ? cachedEntry.value : null;
-  const cachedQuotes = (cachedValue?.quotes || []).map((quote) => ({
-    date: new Date(quote.date),
-    close: Number(quote.close)
-  })).filter((quote) => !Number.isNaN(quote.date.getTime()) && Number.isFinite(quote.close));
+  const cachedQuotes = normalizeYahooMonthlyQuotes(cachedValue?.quotes);
   const isCacheFresh = cachedEntry
     && cachedEntry.ageSeconds < MARKET_CACHE_TTL_SECONDS;
   const cacheCoversRequest = isCacheFresh
+    && cachedQuotes.length >= 2
     && cachedValue?.startDate <= startDate
     && cachedValue?.endDate >= endDate;
   if (cacheCoversRequest) return cachedQuotes;
@@ -1149,21 +1159,19 @@ const fetchYahooMonthlyQuotes = async (ticker, startDate, endDate, market = 'aut
         period2: endDate,
         interval: '1mo'
       });
-      const quotes = (result?.quotes || [])
-        .filter((quote) => Number.isFinite(Number(quote?.close)) && quote?.date)
-        .map((quote) => ({ date: new Date(quote.date), close: Number(quote.close) }))
-        .filter((quote) => !Number.isNaN(quote.date.getTime()))
-        .sort((first, second) => first.date - second.date);
+      const quotes = normalizeYahooMonthlyQuotes(result?.quotes);
 
       if (quotes.length > 0) {
         const unique = new Map();
         [...cachedQuotes, ...quotes].forEach((quote) => {
           unique.set(quote.date.toISOString(), quote);
         });
+        const validQuotes = [...unique.values()]
+          .sort((first, second) => first.date - second.date);
         const cachedStartDate = cachedValue?.startDate;
         const cachedEndDate = cachedValue?.endDate;
         const cacheValue = {
-          quotes: [...unique.values()].map((quote) => ({
+          quotes: validQuotes.map((quote) => ({
             date: quote.date.toISOString(),
             close: quote.close
           })),
@@ -1175,7 +1183,7 @@ const fetchYahooMonthlyQuotes = async (ticker, startDate, endDate, market = 'aut
         } catch (error) {
           console.warn('[market-cache] Não foi possível salvar o histórico Yahoo:', error.message);
         }
-        return quotes;
+        return validQuotes;
       }
       lastError = new Error(`Yahoo não retornou cotações para ${candidate}.`);
     } catch (error) {
@@ -1313,15 +1321,20 @@ const handlePortfolioEvolution = async (request, response) => {
     try {
       return await fetchBcbSeries(series, start, now);
     } catch {
+      apiFailures.push(`BCB ${series}`);
       return null;
     }
   };
+  const apiFailures = [];
 
   const [cdiItems, poupancaItems, ipcaItems, ibovespaQuotes] = await Promise.all([
     fetchMacro('12'),
     fetchMacro('196'),
     fetchMacro('433'),
-    fetchYahooMonthlyQuotes('^BVSP', startIso, endIso).catch(() => null)
+    fetchYahooMonthlyQuotes('^BVSP', startIso, endIso).catch(() => {
+      apiFailures.push('Yahoo Finance');
+      return null;
+    })
   ]);
   const emergencySeries = (annualRate) => new Map(months.map(({ key }, index) => [
     key,
@@ -1385,6 +1398,7 @@ const handlePortfolioEvolution = async (request, response) => {
   const result = {
     periodo: { inicio: startIso, fim: endIso },
     serie: series,
+    apiWarning: apiFailures.length > 0,
     avisos: cdiData.estimated || poupancaData.estimated || ipcaData.estimated
       ? ['Estimativa']
       : []

@@ -5,6 +5,7 @@ import PositionSummary from '../components/Dashboard/PositionSummary';
 
 export default function DashboardPage({
   totals,
+  isAdmin,
   formatMoney,
   themeStyle,
   cardClass,
@@ -44,6 +45,7 @@ export default function DashboardPage({
 
       <BenchmarkChart
         totals={totals}
+        isAdmin={isAdmin}
         isDarkMode={isDarkMode}
         cardClass={cardClass}
         t={t}

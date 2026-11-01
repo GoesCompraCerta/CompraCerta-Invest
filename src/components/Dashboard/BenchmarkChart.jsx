@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { assetsStorage } from '../../services/storageService';
 import { getToken } from '../../services/authService';
+import { sanitizeIbovespaSeries } from '../../utils/benchmarkSeries';
 
 const SERIES = [
   { key: 'carteira', label: 'Minha Carteira', color: '#10b981' },
@@ -21,7 +22,7 @@ const SERIES = [
 ];
 
 const STORAGE_KEY = 'benchmark_last_result';
-const CACHE_VERSION = 7;
+const CACHE_VERSION = 11;
 const BROWSER_CACHE_TTL_MS = 60 * 60 * 1000;
 const normalizeAssets = (assets) => Array.isArray(assets) ? assets : [];
 const readCurrentAssets = (providedAssets) => {
@@ -63,21 +64,32 @@ const formatData = (serie = []) => {
     ? Number((value - baseline).toFixed(2))
     : value ?? null;
 
-  return serie.map((point) => ({
+  const chartData = sanitizeIbovespaSeries(serie.map((point) => ({
     date: point.mes,
     carteira: point.carteira?.rendimento ?? null,
     cdi: rebase(point.cdi, baselines.cdi),
     poupanca: rebase(point.poupanca, baselines.poupanca),
     ipca: rebase(point.ipca, baselines.ipca),
     ibovespa: point.ibovespa ?? null
-  }));
+  })));
+
+  if (import.meta.env.DEV && chartData.length > 0) {
+    const lastPoint = chartData[chartData.length - 1];
+    console.debug('[BenchmarkChart] último ponto chartData:', {
+      date: lastPoint.date,
+      ibovespa: lastPoint.ibovespa
+    });
+  }
+
+  return chartData;
 };
 
-export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
+export default function BenchmarkChart({ totals, isAdmin, isDarkMode, cardClass, t }) {
   const [data, setData] = useState([]);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
+  const [apiWarning, setApiWarning] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState(12);
   const initializedRequestRef = useRef(null);
 
@@ -102,6 +114,7 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
       }
       setData(formatData(saved.serie));
       setWarning(Array.isArray(saved.avisos) ? saved.avisos.join(' ') : '');
+      setApiWarning(Boolean(saved.apiWarning));
       setError('');
       setStatus('success');
       return true;
@@ -116,9 +129,12 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
     setStatus('loading');
     setError('');
     setWarning('');
+    setApiWarning(false);
 
     if (assets.length === 0) {
       setData([]);
+      setWarning('');
+      setApiWarning(false);
       setStatus('success');
       return;
     }
@@ -151,6 +167,7 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
 
       setData(formatData(payload.serie));
       setWarning(Array.isArray(payload.avisos) ? payload.avisos.join(' ') : '');
+      setApiWarning(Boolean(payload.apiWarning));
       setStatus('success');
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -165,6 +182,7 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
       }
     } catch {
       setData([]);
+      setApiWarning(false);
       setError('benchmarkRequestError');
       setStatus('error');
     }
@@ -180,6 +198,7 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
     if (assets.length === 0) {
       setData([]);
       setWarning('');
+      setApiWarning(false);
       setError('');
       setStatus('success');
       return;
@@ -195,6 +214,7 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
   const axisColor = isDarkMode ? '#94a3b8' : '#64748b';
   const gridColor = isDarkMode ? '#334155' : '#e2e8f0';
   const tooltipBackground = isDarkMode ? '#1e293b' : '#fff';
+  const hasUsableIbovespa = data.filter((point) => Number.isFinite(point.ibovespa)).length >= 2;
   const yValues = data.flatMap((point) => SERIES
     .map(({ key }) => point[key])
     .filter((value) => Number.isFinite(value)));
@@ -243,12 +263,15 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
       </div>
       {status === 'loading' && <div className="flex h-56 items-center justify-center text-xs text-slate-400 md:h-[360px]">{t.benchmarkChartLoading}</div>}
       {status === 'error' && <div className="flex h-56 items-center justify-center text-center text-xs text-rose-400 md:h-[360px]">{t[error] || error}</div>}
-      {status === 'success' && warning && (
+      {status === 'success' && isAdmin && (apiWarning || warning) && (
         <div className="mb-3">
           <span className="inline-flex rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
-            {warning}
+            {apiWarning ? t.benchmarkApiWarning : warning}
           </span>
         </div>
+      )}
+      {status === 'success' && !hasUsableIbovespa && data.length > 0 && (
+        <p className="mb-2 text-xs text-slate-400" role="status">{t.benchmarkIbovespaUnavailable}</p>
       )}
       {status === 'success' && data.length === 0 && <div className="flex h-56 items-center justify-center text-xs text-slate-400 md:h-[360px]">{t.benchmarkChartNoAssets}</div>}
       {status === 'success' && data.length >= 2 && (
@@ -260,7 +283,11 @@ export default function BenchmarkChart({ totals, isDarkMode, cardClass, t }) {
               <YAxis domain={['auto', 'auto']} stroke={axisColor} tick={{ fontSize: 10 }} tickFormatter={(value) => `${Number(value).toFixed(1)}%`} width={58} />
               <Tooltip content={renderTooltip} />
               <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
-              {SERIES.filter(({ key }) => data.some((point) => point[key] != null)).map(({ key, label, color }) => (
+              {SERIES.filter(({ key }) => (
+                key === 'ibovespa'
+                  ? hasUsableIbovespa
+                  : data.some((point) => point[key] != null)
+              )).map(({ key, label, color }) => (
                 <Line
                   key={key}
                   type="monotone"

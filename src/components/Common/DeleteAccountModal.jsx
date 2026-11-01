@@ -19,8 +19,8 @@ export default function DeleteAccountModal({
   if (!isOpen) return null;
 
   const panelClass = isDarkMode
-    ? 'border-slate-700 bg-[#111827] text-slate-100'
-    : 'border-slate-200 bg-white text-slate-900 shadow-xl';
+    ? 'border-rose-500/60 bg-[#111827] text-slate-100'
+    : 'border-rose-300 bg-white text-slate-900 shadow-xl';
   const inputClass = isDarkMode
     ? 'border-slate-700 bg-slate-900 text-white placeholder:text-slate-500'
     : 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-400';
@@ -45,7 +45,7 @@ export default function DeleteAccountModal({
             </span>
             <div>
               <h2 id="delete-account-title" className="text-xl font-black">{t.deleteAccountTitle}</h2>
-              <p className="mt-2 text-sm leading-6 opacity-80">{t.deleteAccountWarning}</p>
+              <p className="mt-2 text-sm leading-6 opacity-80">{t.deleteAccountConfirmationMessage}</p>
             </div>
           </div>
           <button

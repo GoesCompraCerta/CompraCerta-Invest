@@ -57,6 +57,7 @@ export default function App() {
   const [pathname, setPathname] = useState(() => window.location.pathname);
   const [isAuthenticated, setIsAuthenticated] = useState(() => authService.isAuthenticated());
   const [isAuthChecking, setIsAuthChecking] = useState(() => authService.isAuthenticated());
+  const [isAdmin, setIsAdmin] = useState(false);
   const [planStatus, setPlanStatus] = useState(null);
   const [isTrialExpired, setIsTrialExpired] = useState(false);
   const isLegalPage = pathname === '/privacy' || pathname === '/terms';
@@ -81,6 +82,7 @@ export default function App() {
     }
     if (!authService.isAuthenticated()) {
       setIsAuthenticated(false);
+      setIsAdmin(false);
       setDisableIntro(false);
       setShowOpeningIntro(false);
       setPlanStatus(null);
@@ -100,6 +102,7 @@ export default function App() {
           if (error.status === 401) throw error;
         }
         if (isMounted) {
+          setIsAdmin(Boolean(profile.user?.is_admin));
           const userDisablesIntro = Boolean(profile.user?.disable_intro);
           setDisableIntro(userDisablesIntro);
           setPositionView(profile.user?.position_view === 'class' ? 'class' : 'overview');
@@ -114,6 +117,7 @@ export default function App() {
       .catch(() => {
         if (isMounted) {
           setIsAuthenticated(false);
+          setIsAdmin(false);
           setIsTrialExpired(false);
           setPositionView('overview');
         }
@@ -207,6 +211,7 @@ export default function App() {
     try {
       const profile = await authService.getMe();
       setServerApiKeys(profile.user || {});
+      setIsAdmin(Boolean(profile.user?.is_admin));
       userDisablesIntro = Boolean(profile.user?.disable_intro);
       setDisableIntro(userDisablesIntro);
       setPositionView(profile.user?.position_view === 'class' ? 'class' : 'overview');
@@ -218,6 +223,7 @@ export default function App() {
     } catch {
       setPlanStatus(null);
       setIsTrialExpired(false);
+      setIsAdmin(false);
       setDisableIntro(false);
       setPositionView('overview');
     } finally {
@@ -233,6 +239,7 @@ export default function App() {
       authService.removeToken();
     }
     setIsAuthenticated(false);
+    setIsAdmin(false);
     setDisableIntro(false);
     setPlanStatus(null);
     setIsTrialExpired(false);
@@ -396,6 +403,7 @@ export default function App() {
         {activeTab !== 'configuracoes' && (
           <KPICards
             totals={totals}
+            isAdmin={isAdmin}
             formatMoney={formatMoney}
             themeStyle={themeStyle}
             cardClass={cardClass}

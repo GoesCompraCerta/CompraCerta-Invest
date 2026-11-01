@@ -29,6 +29,7 @@ import {
 } from './src/services/proventosService.js';
 import { updateDisableIntro, updatePositionView } from './src/services/authService.js';
 import { parseNumberWithMultiplier } from './src/utils/formatNumbers.js';
+import { sanitizeIbovespaSeries } from './src/utils/benchmarkSeries.js';
 
 const tests = [];
 
@@ -154,6 +155,26 @@ addTest(
         globalThis.localStorage = originalLocalStorage;
       }
     }
+  }
+);
+
+addTest(
+  'Ibovespa descarta queda impossível e mantém último valor quando o dado final falta',
+  {},
+  'Valores abaixo de -100% e um último ponto ausente não derrubam a série',
+  () => {
+    const series = sanitizeIbovespaSeries([
+      { date: '2026-09', ibovespa: 18 },
+      { date: '2026-10', ibovespa: -105 },
+      { date: '2026-11', ibovespa: null }
+    ]);
+
+    return series[1].ibovespa === 18
+      && series[2].ibovespa === 18
+      && sanitizeIbovespaSeries([
+        { date: '2026-09', ibovespa: 0 },
+        { date: '2026-10', ibovespa: -80 }
+      ])[1].ibovespa === -80;
   }
 );
 
