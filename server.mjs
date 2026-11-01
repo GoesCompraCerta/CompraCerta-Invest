@@ -338,8 +338,7 @@ const handleUpdateAuthPreferences = async (request, response) => {
   }
 
   const preferences = {};
-  const positionViewWasSent = Object.hasOwn(payload ?? {}, 'position_view');
-  if (positionViewWasSent) {
+  if (payload?.position_view !== undefined) {
     if (!['overview', 'class'].includes(payload.position_view)) {
       sendJson(response, 400, { error: 'A visão de posicionamento informada é inválida.' });
       return;
