@@ -68,7 +68,7 @@ export default function OpeningIntro({ onFinish, t }) {
     setIsMuted(video.muted);
   };
 
-  const videoSrc = isMobile ? '/abertura-mobile.mp4' : '/1000131540.mp4';
+  const videoSrc = isMobile ? '/abertura-mobile.mp4' : '/abertura-desktop.mp4';
   console.log('Vídeo de abertura src:', videoSrc);
 
   return (
