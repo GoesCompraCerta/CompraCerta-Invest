@@ -143,6 +143,7 @@ const serveProductionFile = async (request, response) => {
     '.png': 'image/png',
     '.svg': 'image/svg+xml',
     '.webp': 'image/webp',
+    '.webmanifest': 'application/manifest+json; charset=utf-8',
     '.woff': 'font/woff',
     '.woff2': 'font/woff2'
   }[extname(filePath).toLowerCase()] || 'application/octet-stream';
