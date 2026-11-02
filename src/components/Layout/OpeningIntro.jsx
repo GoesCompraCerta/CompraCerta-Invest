@@ -4,7 +4,9 @@ export default function OpeningIntro({ onFinish, t }) {
   const videoRef = useRef(null);
   const transitionStartedRef = useRef(false);
   const introTimeoutRef = useRef(null);
-  const [introFadingOut, setIntroFadingOut] = useState(false);
+  const fadeFrameRef = useRef(null);
+  const [hideVideo, setHideVideo] = useState(false);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
@@ -14,7 +16,11 @@ export default function OpeningIntro({ onFinish, t }) {
     transitionStartedRef.current = true;
     window.clearTimeout(introTimeoutRef.current);
     videoRef.current?.pause();
-    setIntroFadingOut(true);
+    setHideVideo(true);
+    fadeFrameRef.current = window.requestAnimationFrame(() => {
+      fadeFrameRef.current = null;
+      setIsFadingOut(true);
+    });
   };
 
   const handleVideoEnd = () => {
@@ -39,6 +45,9 @@ export default function OpeningIntro({ onFinish, t }) {
   useEffect(() => {
     return () => {
       window.clearTimeout(introTimeoutRef.current);
+      if (fadeFrameRef.current !== null) {
+        window.cancelAnimationFrame(fadeFrameRef.current);
+      }
     };
   }, []);
 
@@ -63,11 +72,27 @@ export default function OpeningIntro({ onFinish, t }) {
 
   return (
     <div className="abertura-overlay fixed inset-0 z-[100]">
-      <div className="relative h-screen w-screen overflow-hidden bg-black">
+      <div className="relative h-screen w-screen overflow-hidden">
+        <div
+          className={`absolute inset-0 z-0 bg-black transition-opacity duration-500 ${
+            isFadingOut ? 'opacity-0' : 'opacity-100'
+          }`}
+          onTransitionEnd={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              event.propertyName === 'opacity' &&
+              isFadingOut
+            ) {
+              onFinish();
+            }
+          }}
+        />
         <video
           ref={videoRef}
           key={videoSrc}
-          className="absolute inset-0 z-0 h-full w-full object-cover"
+          className={`absolute inset-0 z-10 h-full w-full object-cover ${
+            hideVideo ? 'hidden' : ''
+          }`}
           autoPlay
           muted={isMuted}
           playsInline
@@ -79,21 +104,7 @@ export default function OpeningIntro({ onFinish, t }) {
         >
           <source src={videoSrc} type="video/mp4" />
         </video>
-        <div
-          className={`absolute inset-0 z-40 bg-black transition-opacity duration-500 ${
-            introFadingOut ? 'opacity-100' : 'opacity-0'
-          }`}
-          onTransitionEnd={(event) => {
-            if (
-              event.target === event.currentTarget &&
-              event.propertyName === 'opacity' &&
-              introFadingOut
-            ) {
-              onFinish();
-            }
-          }}
-        />
-        <div className="absolute z-50 bottom-5 right-5 flex gap-2">
+        <div className={`absolute z-50 bottom-5 right-5 flex gap-2 ${hideVideo ? 'hidden' : ''}`}>
           <button
             type="button"
             onClick={handleSkip}
