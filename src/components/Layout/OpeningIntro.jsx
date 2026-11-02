@@ -3,33 +3,25 @@ import { useEffect, useRef, useState } from 'react';
 export default function OpeningIntro({ onFinish, t }) {
   const videoRef = useRef(null);
   const transitionStartedRef = useRef(false);
-  const pauseTimeoutRef = useRef(null);
-  const closeTimeoutRef = useRef(null);
   const introTimeoutRef = useRef(null);
-  const [isClosing, setIsClosing] = useState(false);
+  const [introFadingOut, setIntroFadingOut] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
   const startFadeOut = () => {
-    setIsClosing(true);
-    closeTimeoutRef.current = window.setTimeout(onFinish, 300);
+    if (transitionStartedRef.current) return;
+
+    transitionStartedRef.current = true;
+    window.clearTimeout(introTimeoutRef.current);
+    videoRef.current?.pause();
+    setIntroFadingOut(true);
   };
 
   const handleVideoEnd = () => {
-    if (transitionStartedRef.current) return;
-
-    transitionStartedRef.current = true;
-    window.clearTimeout(introTimeoutRef.current);
-    videoRef.current?.pause();
-    pauseTimeoutRef.current = window.setTimeout(startFadeOut, 500);
+    startFadeOut();
   };
 
   const handleSkip = () => {
-    if (transitionStartedRef.current) return;
-
-    transitionStartedRef.current = true;
-    window.clearTimeout(introTimeoutRef.current);
-    videoRef.current?.pause();
     startFadeOut();
   };
 
@@ -41,14 +33,12 @@ export default function OpeningIntro({ onFinish, t }) {
     video.play().catch((error) => {
       console.error('Não foi possível iniciar o vídeo de abertura:', error);
     });
-    introTimeoutRef.current = window.setTimeout(handleVideoEnd, 5200);
+    introTimeoutRef.current = window.setTimeout(handleVideoEnd, 5500);
   };
 
   useEffect(() => {
     return () => {
       window.clearTimeout(introTimeoutRef.current);
-      window.clearTimeout(pauseTimeoutRef.current);
-      window.clearTimeout(closeTimeoutRef.current);
     };
   }, []);
 
@@ -72,7 +62,7 @@ export default function OpeningIntro({ onFinish, t }) {
   console.log('Vídeo de abertura src:', videoSrc);
 
   return (
-    <div className={`abertura-overlay fixed inset-0 z-[100] ${isClosing ? 'sumir' : ''}`}>
+    <div className="abertura-overlay fixed inset-0 z-[100]">
       <div className="relative h-screen w-screen overflow-hidden bg-black">
         <video
           ref={videoRef}
@@ -89,6 +79,20 @@ export default function OpeningIntro({ onFinish, t }) {
         >
           <source src={videoSrc} type="video/mp4" />
         </video>
+        <div
+          className={`absolute inset-0 z-40 bg-black transition-opacity duration-500 ${
+            introFadingOut ? 'opacity-100' : 'opacity-0'
+          }`}
+          onTransitionEnd={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              event.propertyName === 'opacity' &&
+              introFadingOut
+            ) {
+              onFinish();
+            }
+          }}
+        />
         <div className="absolute z-50 bottom-5 right-5 flex gap-2">
           <button
             type="button"
