@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { Suspense, useState, useMemo, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard,
   Wallet,
@@ -17,11 +17,11 @@ import OpeningIntro from './components/Layout/OpeningIntro';
 import KPICards from './components/Common/KPICards';
 import DashboardPage from './pages/DashboardPage';
 import PortfolioPage from './pages/PortfolioPage';
-import RebalancerPage from './pages/RebalancerPage';
-import ProventosPage from './pages/ProventosPage';
-import CompoundInterestPage from './pages/CompoundInterestPage';
-import MasterMethodsPage from './pages/MasterMethodsPage';
-import TresMosqueteirosFIIPage from './pages/TresMosqueteirosFII/TresMosqueteirosFIIPage';
+const RebalancerPage = React.lazy(() => import('./pages/RebalancerPage'));
+const ProventosPage = React.lazy(() => import('./pages/ProventosPage'));
+const CompoundInterestPage = React.lazy(() => import('./pages/CompoundInterestPage'));
+const MasterMethodsPage = React.lazy(() => import('./pages/MasterMethodsPage'));
+const TresMosqueteirosFIIPage = React.lazy(() => import('./pages/TresMosqueteirosFII/TresMosqueteirosFIIPage'));
 import UserSettingsPage from './pages/UserSettingsPage';
 import TrialExpiredPage from './pages/TrialExpiredPage';
 import LoginPage from './pages/LoginPage';
@@ -92,15 +92,15 @@ export default function App() {
       return () => { isMounted = false; };
     }
 
-    authService.getMe()
-      .then(async (profile) => {
+    Promise.all([
+      authService.getMe(),
+      authService.getPlanStatus().catch((error) => {
+        if (error.status === 401) throw error;
+        return null;
+      })
+    ])
+      .then(([profile, status]) => {
         setServerApiKeys(profile.user || {});
-        let status = null;
-        try {
-          status = await authService.getPlanStatus();
-        } catch (error) {
-          if (error.status === 401) throw error;
-        }
         if (isMounted) {
           setIsAdmin(Boolean(profile.user?.is_admin));
           const userDisablesIntro = Boolean(profile.user?.disable_intro);
@@ -209,13 +209,15 @@ export default function App() {
     let trialExpired = false;
     let userDisablesIntro = false;
     try {
-      const profile = await authService.getMe();
+      const [profile, status] = await Promise.all([
+        authService.getMe(),
+        authService.getPlanStatus()
+      ]);
       setServerApiKeys(profile.user || {});
       setIsAdmin(Boolean(profile.user?.is_admin));
       userDisablesIntro = Boolean(profile.user?.disable_intro);
       setDisableIntro(userDisablesIntro);
       setPositionView(profile.user?.position_view === 'class' ? 'class' : 'overview');
-      const status = await authService.getPlanStatus();
       setPlanStatus(status);
       trialExpired = status?.plan === 'trial' && status.daysRemaining <= 0;
       setIsTrialExpired(trialExpired);
@@ -400,6 +402,7 @@ export default function App() {
 
       {/* ── Main content ── */}
       <main className="flex-1 w-full p-4 md:p-8 overflow-y-auto">
+        <Suspense fallback={<div className="bg-[#0f172a] h-screen"></div>}>
         {activeTab !== 'configuracoes' && (
           <KPICards
             totals={totals}
@@ -552,6 +555,7 @@ export default function App() {
           />
         )}
 
+        </Suspense>
       </main>
       </div>
       </ProtectedRoute>

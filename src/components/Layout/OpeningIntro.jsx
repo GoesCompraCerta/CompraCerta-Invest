@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 export default function OpeningIntro({ onFinish, t }) {
   const videoRef = useRef(null);
   const transitionStartedRef = useRef(false);
+  const videoLoadTimeoutRef = useRef(null);
   const introTimeoutRef = useRef(null);
   const fadeFrameRef = useRef(null);
+  const onFinishRef = useRef(onFinish);
   const [hideVideo, setHideVideo] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
@@ -15,6 +17,7 @@ export default function OpeningIntro({ onFinish, t }) {
     if (transitionStartedRef.current) return;
 
     transitionStartedRef.current = true;
+    window.clearTimeout(videoLoadTimeoutRef.current);
     window.clearTimeout(introTimeoutRef.current);
     videoRef.current?.pause();
     setHideVideo(true);
@@ -37,6 +40,8 @@ export default function OpeningIntro({ onFinish, t }) {
 
     if (!video || introTimeoutRef.current !== null || transitionStartedRef.current) return;
 
+    window.clearTimeout(videoLoadTimeoutRef.current);
+    videoLoadTimeoutRef.current = null;
     video.play().catch((error) => {
       console.error('Não foi possível iniciar o vídeo de abertura:', error);
     });
@@ -44,7 +49,18 @@ export default function OpeningIntro({ onFinish, t }) {
   };
 
   useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
+
+  useEffect(() => {
+    videoLoadTimeoutRef.current = window.setTimeout(() => {
+      if (transitionStartedRef.current) return;
+      transitionStartedRef.current = true;
+      onFinishRef.current();
+    }, 3000);
+
     return () => {
+      window.clearTimeout(videoLoadTimeoutRef.current);
       window.clearTimeout(introTimeoutRef.current);
       if (fadeFrameRef.current !== null) {
         window.cancelAnimationFrame(fadeFrameRef.current);
@@ -68,7 +84,9 @@ export default function OpeningIntro({ onFinish, t }) {
     setIsMuted(video.muted);
   };
 
-  const videoSrc = isMobile ? '/abertura-mobile.mp4' : '/abertura-desktop.mp4';
+  const videoSrc = isMobile
+    ? '/Video%20Project%203-compressed.mp4'
+    : '/Video%20Project%205-compressed.mp4';
   console.log('Vídeo de abertura src:', videoSrc);
 
   return (
