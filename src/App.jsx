@@ -342,7 +342,7 @@ export default function App() {
   // ═════════════════════════════════════════════════════════════════════════════
   return (
     <>
-      {isAuthenticated && showOpeningIntro && !disableIntro && (
+      {isAuthenticated && !isAuthChecking && showOpeningIntro && !disableIntro && (
         <OpeningIntro t={t} onFinish={() => setShowOpeningIntro(false)} />
       )}
       <ProtectedRoute

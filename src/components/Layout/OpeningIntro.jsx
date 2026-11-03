@@ -7,6 +7,7 @@ export default function OpeningIntro({ onFinish, t }) {
   const fadeFrameRef = useRef(null);
   const [hideVideo, setHideVideo] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
@@ -74,7 +75,7 @@ export default function OpeningIntro({ onFinish, t }) {
     <div className="abertura-overlay fixed inset-0 z-[100]">
       <div className="relative h-screen w-screen overflow-hidden">
         <div
-          className={`absolute inset-0 z-0 bg-black transition-opacity duration-500 ${
+          className={`absolute inset-0 z-0 bg-[#0f172a] transition-opacity duration-500 ${
             isFadingOut ? 'opacity-0' : 'opacity-100'
           }`}
           onTransitionEnd={(event) => {
@@ -87,9 +88,13 @@ export default function OpeningIntro({ onFinish, t }) {
             }
           }}
         />
+        {!isVideoLoaded && (
+          <div className="absolute inset-0 z-20 bg-[#0f172a]" aria-hidden="true" />
+        )}
         <video
           ref={videoRef}
           key={videoSrc}
+          fetchpriority="high"
           className={`absolute inset-0 z-10 h-full w-full object-cover ${
             hideVideo ? 'hidden' : ''
           }`}
@@ -97,6 +102,7 @@ export default function OpeningIntro({ onFinish, t }) {
           muted={isMuted}
           playsInline
           preload="auto"
+          onLoadedData={() => setIsVideoLoaded(true)}
           onCanPlay={handleCanPlay}
           onEnded={handleVideoEnd}
           onError={(event) => console.error('Erro no vídeo:', event.currentTarget.error)}
