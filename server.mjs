@@ -148,7 +148,12 @@ const serveProductionFile = async (request, response) => {
     '.woff2': 'font/woff2'
   }[extname(filePath).toLowerCase()] || 'application/octet-stream';
 
-  response.writeHead(200, { 'Content-Type': contentType });
+  response.writeHead(200, {
+    'Content-Type': contentType,
+    ...(extname(filePath).toLowerCase() === '.webmanifest'
+      ? { 'Cache-Control': 'no-cache' }
+      : {})
+  });
   response.end(request.method === 'HEAD' ? undefined : content);
 };
 
